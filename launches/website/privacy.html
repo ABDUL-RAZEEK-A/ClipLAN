@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — ClipLAN</title>
+  <meta name="description" content="ClipLAN Privacy Policy. Learn how ClipLAN handles your data — spoiler: we don't collect any.">
+  <link rel="icon" href="assets/logo.jpeg" type="image/jpeg">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .legal-page { padding: calc(var(--nav-height) + 60px) 0 80px; background: var(--bg); min-height: 100vh; }
+    .legal-container { max-width: 800px; margin: 0 auto; padding: 0 24px; }
+    .legal-header { margin-bottom: 48px; }
+    .legal-header h1 { font-size: clamp(2rem, 4vw, 3rem); margin-bottom: 12px; }
+    .legal-header .date { color: var(--text-muted); font-size: 0.9rem; }
+    .legal-content h2 {
+      font-size: 1.4rem; margin-top: 48px; margin-bottom: 16px;
+      padding-bottom: 8px; border-bottom: 1px solid var(--border);
+      color: var(--primary-light);
+    }
+    .legal-content p { margin-bottom: 16px; color: var(--text-secondary); line-height: 1.9; }
+    .legal-content ul { margin: 16px 0; padding-left: 24px; }
+    .legal-content li { margin-bottom: 8px; color: var(--text-secondary); line-height: 1.8; list-style: disc; }
+    .legal-content strong { color: var(--text-primary); }
+    .back-link {
+      display: inline-flex; align-items: center; gap: 8px;
+      margin-bottom: 32px; color: var(--primary-light);
+      font-weight: 500; transition: gap 0.3s ease;
+    }
+    .back-link:hover { gap: 12px; }
+    .legal-highlight {
+      padding: 24px; background: rgba(59,130,246,0.05);
+      border-left: 3px solid var(--primary-light);
+      border-radius: 0 var(--radius-md) var(--radius-md) 0;
+      margin: 24px 0;
+    }
+    .legal-highlight p { margin-bottom: 0; color: var(--text-primary); font-weight: 500; }
+  </style>
+</head>
+<body>
+
+  <!-- NAVIGATION -->
+  <nav class="navbar scrolled" id="navbar">
+    <div class="container">
+      <a href="index.html" class="nav-brand">
+        <img src="assets/logo.jpeg" alt="ClipLAN Logo">
+        <span>ClipLAN</span>
+      </a>
+      <div class="nav-links" id="navLinks">
+        <a href="index.html#features">Features</a>
+        <a href="index.html#download">Download</a>
+        <a href="privacy.html" class="active">Privacy</a>
+        <a href="terms.html">Terms</a>
+        <a href="index.html#download" class="nav-cta">Download</a>
+      </div>
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <div class="legal-page">
+    <div class="legal-container">
+      <a href="index.html" class="back-link">← Back to Home</a>
+
+      <div class="legal-header">
+        <h1>Privacy <span class="gradient-text">Policy</span></h1>
+        <p class="date">Last updated: August 22, 2026</p>
+      </div>
+
+      <div class="legal-highlight">
+        <p>🛡️ ClipLAN is a 100% offline, serverless application. We do not collect, store, transmit, or process any personal data whatsoever.</p>
+      </div>
+
+      <div class="legal-content">
+        <h2>1. Introduction</h2>
+        <p>Welcome to ClipLAN ("the App", "we", "us", "our"). This Privacy Policy explains how information is handled when you use our peer-to-peer file sharing and clipboard application. Your privacy is paramount to us — which is precisely why we built ClipLAN to operate without any cloud infrastructure.</p>
+
+        <h2>2. Information We Collect</h2>
+        <p><strong>None.</strong> ClipLAN operates entirely offline on your local network (LAN). We have zero servers, zero analytics, zero tracking pixels, and zero data collection infrastructure.</p>
+        <p>Specifically, ClipLAN does <strong>NOT</strong> collect:</p>
+        <ul>
+          <li>Personal identification information (name, email, phone)</li>
+          <li>Device identifiers or advertising IDs</li>
+          <li>Usage analytics or behavioral data</li>
+          <li>Files, content, or clipboard data you transfer</li>
+          <li>Location data or GPS coordinates</li>
+          <li>Cookies, tokens, or session data</li>
+          <li>Network metadata beyond what is required for local discovery</li>
+        </ul>
+
+        <h2>3. Local Network Operations</h2>
+        <p>ClipLAN uses your device's local network capabilities exclusively for peer-to-peer functionality:</p>
+        <ul>
+          <li><strong>UDP Discovery (Port 53317):</strong> ClipLAN broadcasts small JSON packets containing your device name and platform type on your local network to discover nearby devices. These packets never leave your local router.</li>
+          <li><strong>TCP File Transfer (Port 53318):</strong> Files are streamed directly between devices on the same local network. No data is ever routed through external servers.</li>
+          <li><strong>Clipboard Sharing:</strong> Text snippets are sent directly between devices via UDP broadcast or TCP unicast — never stored externally.</li>
+        </ul>
+
+        <h2>4. Device-Local Storage</h2>
+        <p>ClipLAN stores the following data <strong>only on your device</strong> using Hive NoSQL:</p>
+        <ul>
+          <li>Your chosen device name (for display to other users on the network)</li>
+          <li>Transfer history (file names, sizes, timestamps — stored locally only)</li>
+          <li>Your clipboard snippets (stored locally only)</li>
+          <li>App settings and preferences</li>
+        </ul>
+        <p>This data is never transmitted to any server, cloud, or third party. You can clear all stored data from within the app's Settings screen at any time.</p>
+
+        <h2>5. Permissions</h2>
+        <p>ClipLAN requests the following operating system permissions:</p>
+        <ul>
+          <li><strong>Local Network / Nearby Wi-Fi Devices:</strong> Required for UDP/TCP peer discovery and file transfer. This permission does not grant internet access.</li>
+          <li><strong>Storage / File Access:</strong> Required to read files you select for sending and to save received files to your Downloads folder.</li>
+          <li><strong>WakeLock:</strong> Prevents the device from sleeping during active file transfers to ensure transfer stability.</li>
+        </ul>
+
+        <h2>6. Third-Party Services</h2>
+        <p>ClipLAN does <strong>NOT</strong> use any third-party services, SDKs, or analytics libraries that collect user data. There are no ads, no tracking pixels, no Firebase Analytics, no Crashlytics, and no telemetry of any kind.</p>
+
+        <h2>7. Data Security</h2>
+        <p>All file transfers are verified using SHA-256 cryptographic checksums to ensure data integrity. However, transfers occur over your local network and are not encrypted end-to-end. We recommend using ClipLAN only on trusted networks.</p>
+
+        <h2>8. Children's Privacy</h2>
+        <p>ClipLAN does not collect any personal information from anyone, including children under 13. The app is safe for users of all ages.</p>
+
+        <h2>9. Changes to This Policy</h2>
+        <p>We may update this Privacy Policy from time to time. Any changes will be posted on this page with an updated revision date. Since ClipLAN has no server-side component, we cannot push policy update notifications — please check this page periodically.</p>
+
+        <h2>10. Open Source</h2>
+        <p>ClipLAN is open-source software. You can inspect, audit, and verify every line of code to confirm that no data collection occurs. We believe in full transparency.</p>
+
+        <h2>11. Contact Us</h2>
+        <p>If you have any questions about this Privacy Policy, please contact us:</p>
+        <ul>
+          <li>Email: <a href="mailto:contact@cliplan.app" style="color:var(--primary-light)">contact@cliplan.app</a></li>
+          <li>GitHub: <a href="https://github.com" target="_blank" style="color:var(--primary-light)">github.com/cliplan</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-bottom" style="border-top:none;padding-top:0;">
+        <p>&copy; 2026 ClipLAN. All rights reserved.</p>
+        <div class="footer-socials">
+          <a href="index.html">Home</a>
+          <a href="terms.html">Terms</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Mobile nav toggle
+    const navToggle = document.getElementById('navToggle');
+    const navLinks = document.getElementById('navLinks');
+    navToggle.addEventListener('click', () => {
+      navToggle.classList.toggle('open');
+      navLinks.classList.toggle('open');
+    });
+  </script>
+</body>
+</html>

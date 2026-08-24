@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClipLAN — Blazing Fast P2P File Sharing | No Internet Required</title>
+  <meta name="description" content="ClipLAN is a serverless, peer-to-peer file sharing app that transfers files at maximum LAN speed. No cloud, no internet, no limits. Available on Android, macOS, and Windows.">
+  <meta name="keywords" content="file sharing, P2P, LAN, local transfer, clipboard sharing, offline, cross-platform, Android, macOS, Windows">
+  <meta name="author" content="ClipLAN">
+  <meta property="og:title" content="ClipLAN — Blazing Fast P2P File Sharing">
+  <meta property="og:description" content="Share files at maximum LAN speed. No cloud, no internet, no limits.">
+  <meta property="og:type" content="website">
+  <meta name="theme-color" content="#060B18">
+
+  <!-- Favicon -->
+  <link rel="icon" href="assets/logo.jpeg" type="image/jpeg">
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       LOADING SCREEN
+       ══════════════════════════════════════════════════════════════════════ -->
+  <div class="loader" id="loader">
+    <div class="loader-ring"></div>
+    <div class="loader-text">Loading ClipLAN…</div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       NAVIGATION
+       ══════════════════════════════════════════════════════════════════════ -->
+  <nav class="navbar" id="navbar">
+    <div class="container">
+      <a href="#" class="nav-brand">
+        <img src="assets/logo.jpeg" alt="ClipLAN Logo">
+        <span>ClipLAN</span>
+      </a>
+      <div class="nav-links" id="navLinks">
+        <a href="#features">Features</a>
+        <a href="#how-it-works">How It Works</a>
+        <a href="#showcase">Screenshots</a>
+        <a href="#tech">Technology</a>
+        <a href="#download" class="nav-cta">Download</a>
+      </div>
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       HERO SECTION
+       ══════════════════════════════════════════════════════════════════════ -->
+  <section class="hero" id="hero">
+    <!-- Animated background -->
+    <div class="hero-bg">
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+      <div class="orb orb-3"></div>
+    </div>
+    <div class="hero-grid"></div>
+
+    <!-- Floating particles (injected by JS) -->
+    <canvas id="particles" style="position:absolute;inset:0;pointer-events:none;z-index:1;"></canvas>
+
+    <div class="container">
+      <div class="hero-content">
+        <div class="hero-badge">
+          <span class="pulse-dot"></span>
+          Open Source & Free Forever
+        </div>
+
+        <h1>
+          Share Files at the
+          <span class="highlight gradient-text">Speed of Light</span>
+        </h1>
+
+        <p class="hero-description">
+          ClipLAN is a blazing-fast, serverless, peer-to-peer file sharing app.
+          Transfer gigabytes over your local network at maximum hardware speed. 
+          <strong>No internet, no cloud, zero data collection.</strong> 100% private, secure, and open-source.
+        </p>
+
+        <div class="hero-actions">
+          <a href="#download" class="btn btn-primary">
+            <span class="btn-icon">⬇</span>
+            Download Free
+          </a>
+          <a href="#features" class="btn btn-outline">
+            <span class="btn-icon">✦</span>
+            Explore Features
+          </a>
+        </div>
+
+        <div class="hero-stats">
+          <div class="hero-stat">
+            <div class="number counter" data-target="50">0</div>
+            <div class="label">MB/s+ Transfer Speed</div>
+          </div>
+          <div class="hero-stat">
+            <div class="number">100%</div>
+            <div class="label">Offline & Serverless</div>
+          </div>
+          <div class="hero-stat">
+            <div class="number">SHA-256</div>
+            <div class="label">Integrity Verified</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-visual">
+        <div class="phone-mockup">
+          <div class="phone-glow"></div>
+          <div class="phone-frame">
+            <img src="assets/screenshots/01_Discover_Nearby_Devices.png" alt="ClipLAN App — Discover nearby devices">
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       FEATURES SECTION
+       ══════════════════════════════════════════════════════════════════════ -->
+  <section class="features section" id="features">
+    <div class="container">
+      <div class="section-header reveal">
+        <div class="section-label">Why ClipLAN?</div>
+        <h2 class="section-title">Engineered for <span class="gradient-text">Maximum Performance</span></h2>
+        <p class="section-subtitle">Every feature is built from the ground up for speed, stability, and security — no compromises.</p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card reveal delay-1">
+          <div class="feature-icon">⚡</div>
+          <h3>Blazing Fast & Unlimited</h3>
+          <p>Transfers happen over direct TCP local connections, limited only by your Wi-Fi router's maximum bandwidth. No artificial rate limits — ever.</p>
+        </div>
+
+        <div class="feature-card reveal delay-2">
+          <div class="feature-icon">🔋</div>
+          <h3>Rock-Solid Stability</h3>
+          <p>Engineered for massive files with WakeLock management and OOM backpressure protection. Transfer terabytes on devices with just 2GB RAM.</p>
+        </div>
+
+        <div class="feature-card reveal delay-3">
+          <div class="feature-icon">🔒</div>
+          <h3>Zero Data Collection</h3>
+          <p>ClipLAN collects absolutely no information. Because it's 100% offline and open-source, your files are completely secure. Only your local devices can see your data — no third-party tracking, ever.</p>
+        </div>
+
+        <div class="feature-card reveal delay-4">
+          <div class="feature-icon">🛡️</div>
+          <h3>SHA-256 Verified</h3>
+          <p>Every file is verified with real-time SHA-256 cryptographic checksum computation. Corrupted transfers are detected and deleted automatically.</p>
+        </div>
+
+        <div class="feature-card reveal delay-5">
+          <div class="feature-icon">📋</div>
+          <h3>Network Clipboard</h3>
+          <p>Share text snippets, URLs, and code across all your devices in real-time. Works over both UDP broadcast and direct TCP unicast.</p>
+        </div>
+
+        <div class="feature-card reveal delay-6">
+          <div class="feature-icon">🖥️</div>
+          <h3>Cross-Platform</h3>
+          <p>Works natively on Android, macOS, iOS, and Windows. One app, every platform — with platform-specific optimizations for each OS.</p>
+        </div>
+
+        <div class="feature-card reveal delay-1">
+          <div class="feature-icon">📶</div>
+          <h3>Centralized WiFi Transfer</h3>
+          <p>Connect all your devices to the same WiFi router — home, office, university, or any centralized network — and ClipLAN auto-discovers everyone on the subnet. Transfer files through the router at full LAN speed without any manual IP entry or pairing.</p>
+        </div>
+
+        <div class="feature-card reveal delay-2">
+          <div class="feature-icon">🌐</div>
+          <h3>Works on Any Network</h3>
+          <p>Corporate WiFi, campus hotspots, or home routers — ClipLAN adapts. Multi-cast + unicast fallback means even strict enterprise networks can't stop your transfers.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       HOW IT WORKS
+       ══════════════════════════════════════════════════════════════════════ -->
+  <section class="how-it-works section" id="how-it-works">
+    <div class="container">
+      <div class="section-header reveal">
+        <div class="section-label">Under the Hood</div>
+        <h2 class="section-title">How <span class="gradient-text">ClipLAN</span> Works</h2>
+        <p class="section-subtitle">A peek at the powerful networking engine that makes blazing-fast local sharing possible.</p>
+      </div>
+    </div>
+
+    <div class="steps-track" id="stepsTrack">
+      <div class="step-card reveal-left delay-1">
+        <div class="step-icon">📡</div>
+        <div class="step-number">01</div>
+        <h3>Zero-Config Discovery</h3>
+        <p>Devices find each other instantly using UDP multicasting on port 53317. Heartbeat packets broadcast every 2 seconds with device metadata. No manual setup required.</p>
+      </div>
+      <div class="step-card reveal-left delay-2">
+        <div class="step-icon">🤝</div>
+        <div class="step-number">02</div>
+        <h3>Firewall-Bypassing Handshake</h3>
+        <p>Unicast laser-beam responses bypass client isolation. If Device A hears even one broadcast from Device B, it fires a direct unicast response — defeating strict routers instantly.</p>
+      </div>
+      <div class="step-card reveal-left delay-3">
+        <div class="step-icon">📦</div>
+        <div class="step-number">03</div>
+        <h3>Transfer Approval</h3>
+        <p>When you tap Send, a TCP connection opens. The receiver gets a beautiful approval modal showing file names, sizes, and types. Accept or decline with one tap.</p>
+      </div>
+      <div class="step-card reveal-left delay-4">
+        <div class="step-icon">🚀</div>
+        <div class="step-number">04</div>
+        <h3>Zero-Copy Streaming</h3>
+        <p>Files stream in efficient 2MB chunks over raw TCP sockets on port 53318. Bytes flow directly from NIC to disk — completely bypassing the Dart VM's garbage collector.</p>
+      </div>
+      <div class="step-card reveal-left delay-5">
+        <div class="step-icon">🧠</div>
+        <div class="step-number">05</div>
+        <h3>OOM Backpressure</h3>
+        <p>When Wi-Fi outpaces disk write speed, a dynamic flush algorithm kicks in at 10MB intervals. RAM stays flat — transfer a 1TB file on a 2GB RAM device.</p>
+      </div>
+      <div class="step-card reveal-left delay-6">
+        <div class="step-icon">✅</div>
+        <div class="step-number">06</div>
+        <h3>SHA-256 Verification</h3>
+        <p>Chunked cryptographic conversion runs in parallel with writes. The final hash is compared byte-by-byte. Corrupted files are auto-deleted — zero tolerance for bad data.</p>
+      </div>
+      <div class="step-card reveal-left delay-1">
+        <div class="step-icon">📶</div>
+        <div class="step-number">07</div>
+        <h3>Centralized WiFi Router Transfer</h3>
+        <p>When devices connect to the same WiFi router — whether at home, office, or university — ClipLAN auto-discovers every peer on the subnet. Files route through the centralized access point at full LAN bandwidth. No internet needed — just a shared router.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       APP SHOWCASE — Screenshots
+       ══════════════════════════════════════════════════════════════════════ -->
+  <section class="feature-scroll-showcase section" id="showcase">
+    <div class="container">
+      <div class="section-header reveal">
+        <div class="section-label">See it in Action</div>
+        <h2 class="section-title">Designed for <span class="gradient-text">Simplicity</span></h2>
+        <p class="section-subtitle">Every pixel serves a purpose. Cross-platform sync has never looked this good.</p>
+      </div>
+
+      <!-- Feature 1 (Android) -->
+      <div class="feature-row reveal delay-1">
+        <div class="feature-text">
+          <h3>Instant Device Discovery</h3>
+          <p>No pairing, no QR codes. ClipLAN uses advanced UDP multicasting to instantly find and connect to devices on your local network the moment you open the app.</p>
+        </div>
+        <div class="feature-image screenshot-android">
+          <div class="screenshot-wrapper">
+            <img src="assets/screenshots/01_Discover_Nearby_Devices.png" alt="Device Discovery">
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature 2 (Mac) -->
+      <div class="feature-row reverse reveal delay-2">
+        <div class="feature-text">
+          <h3>Seamless Desktop Integration</h3>
+          <p>Experience a native macOS interface built for productivity. Drag and drop files effortlessly and monitor all your active transfers from a beautiful, minimal window.</p>
+        </div>
+        <div class="feature-image screenshot-mac">
+          <div class="screenshot-wrapper">
+            <img src="assets/screenshots/09_Mac_Desktop_1.png" alt="Mac Integration">
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature 3 (Android) -->
+      <div class="feature-row reveal delay-3">
+        <div class="feature-text">
+          <h3>Lightning Fast Transfers</h3>
+          <p>Say goodbye to slow Bluetooth. By leveraging your local WiFi network, ClipLAN achieves maximum hardware speeds to transfer gigabytes in seconds.</p>
+        </div>
+        <div class="feature-image screenshot-android">
+          <div class="screenshot-wrapper">
+            <img src="assets/screenshots/02_Lightning_Fast_Transfers.png" alt="Fast Transfers">
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature 4 (Mac) -->
+      <div class="feature-row reverse reveal delay-4">
+        <div class="feature-text">
+          <h3>Cross-Platform Harmony</h3>
+          <p>Send and receive files flawlessly between your Mac and Android devices. No cloud limits, no format restrictions—just pure, uncompressed data transfer.</p>
+        </div>
+        <div class="feature-image screenshot-mac">
+          <div class="screenshot-wrapper">
+            <img src="assets/screenshots/10_Mac_Desktop_2.png" alt="Cross Platform">
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature 5 (Android) -->
+      <div class="feature-row reveal delay-5">
+        <div class="feature-text">
+          <h3>Universal Clipboard</h3>
+          <p>Copy text on your phone and instantly paste it on your desktop. ClipLAN automatically syncs your clipboard across all connected devices in real-time.</p>
+        </div>
+        <div class="feature-image screenshot-android">
+          <div class="screenshot-wrapper">
+            <img src="assets/screenshots/06_Clipboard_Sharing.png" alt="Clipboard Sharing">
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       TECH SPECS
+       ══════════════════════════════════════════════════════════════════════ -->
+  <section class="tech-specs section" id="tech">
+    <div class="container">
+      <div class="section-header reveal">
+        <div class="section-label">Technical Architecture</div>
+        <h2 class="section-title">Built with <span class="gradient-text">Cutting-Edge</span> Technology</h2>
+        <p class="section-subtitle">Every component is chosen for maximum performance, reliability, and cross-platform compatibility.</p>
+      </div>
+
+      <div class="specs-grid">
+        <div class="spec-card reveal delay-1">
+          <div class="spec-icon">🎯</div>
+          <div class="spec-content">
+            <h4>Flutter & Dart (AOT Compiled)</h4>
+            <p>Compiles ahead-of-time to native ARM/x86 machine code. 60-120 FPS animations run smoothly even during heavy I/O operations. Direct C-level socket bindings via dart:io.</p>
+          </div>
+        </div>
+        <div class="spec-card reveal delay-2">
+          <div class="spec-icon">📡</div>
+          <div class="spec-content">
+            <h4>UDP Discovery Engine (Port 53317)</h4>
+            <p>Multi-cast heartbeat to 255.255.255.255, subnet broadcast, and multicast groups 224.0.0.1 & 224.0.0.251. Resilient garbage collection with 15-second timeout.</p>
+          </div>
+        </div>
+        <div class="spec-card reveal delay-3">
+          <div class="spec-icon">⚡</div>
+          <div class="spec-content">
+            <h4>TCP Transfer Engine (Port 53318)</h4>
+            <p>Raw TCP streaming with length-prefixed JSON control frames. Zero-copy architecture using IOSink.add() with dynamic backpressure flushing at 10MB intervals.</p>
+          </div>
+        </div>
+        <div class="spec-card reveal delay-4">
+          <div class="spec-icon">🔐</div>
+          <div class="spec-content">
+            <h4>SHA-256 Chunked Verification</h4>
+            <p>Real-time cryptographic checksum using startChunkedConversion() sink. Hash is computed in parallel with disk writes — zero performance overhead.</p>
+          </div>
+        </div>
+        <div class="spec-card reveal delay-5">
+          <div class="spec-icon">💾</div>
+          <div class="spec-content">
+            <h4>Hive NoSQL Persistence</h4>
+            <p>Pure-Dart key-value store operating in-memory with async disk sync. Lightning-fast reads of transfer history — no SQL joins, no locking delays.</p>
+          </div>
+        </div>
+        <div class="spec-card reveal delay-6">
+          <div class="spec-icon">🔒</div>
+          <div class="spec-content">
+            <h4>Hardware WakeLock Control</h4>
+            <p>Active CPU wakelock during transfers. Wi-Fi radio stays at max voltage even with screen off. Auto-releases on transfer completion.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       COMPARISON TABLE
+       ══════════════════════════════════════════════════════════════════════ -->
+  <section class="comparison-section section" id="comparison">
+    <div class="container">
+      <div class="section-header reveal">
+        <div class="section-label">The ClipLAN Advantage</div>
+        <h2 class="section-title">How We <span class="gradient-text">Compare</span></h2>
+      </div>
+
+      <div class="reveal">
+        <table class="comparison-table">
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th class="highlight-col">ClipLAN</th>
+              <th>AirDrop</th>
+              <th>SHAREit</th>
+              <th>Google Drive</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>No Internet Required</td>
+              <td class="highlight-col"><span class="check">✓</span></td>
+              <td><span class="check">✓</span></td>
+              <td><span class="check">✓</span></td>
+              <td><span class="cross">✗</span></td>
+            </tr>
+            <tr>
+              <td>Cross-Platform</td>
+              <td class="highlight-col"><span class="check">✓</span></td>
+              <td><span class="cross">✗</span></td>
+              <td><span class="check">✓</span></td>
+              <td><span class="check">✓</span></td>
+            </tr>
+            <tr>
+              <td>No File Size Limit</td>
+              <td class="highlight-col"><span class="check">✓</span></td>
+              <td><span class="check">✓</span></td>
+              <td><span class="check">✓</span></td>
+              <td><span class="cross">✗</span></td>
+            </tr>
+            <tr>
+              <td>Clipboard Sharing</td>
+              <td class="highlight-col"><span class="check">✓</span></td>
+              <td><span class="cross">✗</span></td>
+              <td><span class="cross">✗</span></td>
+              <td><span class="cross">✗</span></td>
+            </tr>
+            <tr>
+              <td>SHA-256 Verification</td>
+              <td class="highlight-col"><span class="check">✓</span></td>
+              <td><span class="cross">✗</span></td>
+              <td><span class="cross">✗</span></td>
+              <td><span class="cross">✗</span></td>
+            </tr>
+            <tr>
+              <td>Open Source</td>
+              <td class="highlight-col"><span class="check">✓</span></td>
+              <td><span class="cross">✗</span></td>
+              <td><span class="cross">✗</span></td>
+              <td><span class="cross">✗</span></td>
+            </tr>
+            <tr>
+              <td>No Ads, No Tracking</td>
+              <td class="highlight-col"><span class="check">✓</span></td>
+              <td><span class="check">✓</span></td>
+              <td><span class="cross">✗</span></td>
+              <td><span class="cross">✗</span></td>
+            </tr>
+            <tr>
+              <td>Max LAN Speed</td>
+              <td class="highlight-col"><span class="check">✓</span> 50+ MB/s</td>
+              <td><span class="check">✓</span></td>
+              <td><span class="cross">✗</span> Throttled</td>
+              <td><span class="cross">✗</span> Cloud-limited</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       DOWNLOAD SECTION
+       ══════════════════════════════════════════════════════════════════════ -->
+  <section class="download section" id="download">
+    <div class="container">
+      <div class="download-wrapper">
+        <div class="section-header reveal">
+          <div class="section-label">Get ClipLAN</div>
+          <h2 class="section-title">Download for <span class="gradient-text">Your Platform</span></h2>
+          <p class="section-subtitle">Free, open-source, and available everywhere. Choose your operating system below.</p>
+        </div>
+
+        <div class="download-platforms" style="grid-template-columns: repeat(4, 1fr); max-width: 1100px;">
+          <!-- Android -->
+          <div class="platform-card reveal delay-1">
+            <span class="platform-icon">🤖</span>
+            <h3>Android</h3>
+            <p class="platform-ext">.apk • v1.0.1 • ~68 MB</p>
+            <a href="downloads/ClipLAN-v1.0.1.apk" download class="btn btn-primary" style="width:100%;justify-content:center;margin-bottom:12px;">
+              <span class="btn-icon">⬇</span>
+              Download APK
+            </a>
+            <a href="https://play.google.com/store" target="_blank" class="google-play-badge" style="display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:var(--surface);border:1px solid var(--border-bright);border-radius:var(--radius-full);font-size:0.85rem;font-weight:600;color:var(--text-primary);transition:all 0.3s ease;width:100%;justify-content:center;">
+              <svg width="20" height="20" viewBox="0 0 512 512" fill="none"><path d="M325.3 234.3L104.6 13l280.8 161.2-60.1 60.1zM47 0C34 6.8 25.3 19.2 25.3 35.3v441.3c0 16.1 8.7 28.5 21.7 35.3l256.6-256L47 0zm425.2 225.6l-58.9-34.1-65.7 64.5 65.7 64.5 60.1-34.1c18-14.3 18-46.5-1.2-60.8zM104.6 499l280.8-161.2-60.1-60.1L104.6 499z" fill="#4CAF50"/></svg>
+              Get it on Google Play
+            </a>
+          </div>
+          <!-- macOS -->
+          <div class="platform-card mac-card reveal delay-2">
+            <span class="platform-icon">🍎</span>
+            <h3>macOS</h3>
+            <p class="platform-ext">.dmg • v1.0.1 • ~22 MB</p>
+            <div style="display: flex; flex-direction: column; gap: 12px; margin-top: auto;">
+              <a href="downloads/ClipLAN-v1.0.1.dmg" download class="btn btn-primary" style="width:100%;justify-content:center;">
+                <span class="btn-icon">⬇</span>
+                Download DMG
+              </a>
+              <a href="#" onclick="openModal('macInstallModal'); return false;" style="font-size: 0.85rem; color: var(--text-secondary); text-decoration: underline; transition: color 0.2s;">How to open on Mac?</a>
+            </div>
+          </div>
+          <!-- Windows -->
+          <div class="platform-card reveal delay-3">
+            <span class="platform-icon">🪟</span>
+            <h3>Windows</h3>
+            <p class="platform-ext">.exe • v1.0.1 • ~22 MB</p>
+            <a href="downloads/ClipLAN-v1.0.1.exe" download class="btn btn-primary" style="width:100%;justify-content:center;">
+              <span class="btn-icon">⬇</span>
+              Download EXE
+            </a>
+          </div>
+          <!-- iOS -->
+          <div class="platform-card reveal delay-4">
+            <span class="platform-icon">📱</span>
+            <h3>iOS (iPhone / iPad)</h3>
+            <p class="platform-ext" style="color:var(--warning);">Coming Soon</p>
+            <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:20px;line-height:1.6;">Interested in ClipLAN for iOS? Reach out to us and we'll notify you when it's available.</p>
+            <a href="mailto:abdulrazeek2006@gmail.com?subject=ClipLAN%20iOS%20Interest&body=Hi%2C%20I'm%20interested%20in%20ClipLAN%20for%20iOS.%20Please%20notify%20me%20when%20it's%20available!" class="btn btn-outline" style="width:100%;justify-content:center;">
+              <span class="btn-icon">✉</span>
+              Contact Us
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       SOCIAL PROOF
+       ══════════════════════════════════════════════════════════════════════ -->
+  <section class="social-proof section" id="reviews">
+    <div class="container">
+      <div class="section-header reveal">
+        <div class="section-label">What People Say</div>
+        <h2 class="section-title">Loved by <span class="gradient-text">Users</span></h2>
+      </div>
+
+      <div class="proof-grid">
+        <div class="proof-card reveal delay-1">
+          <div class="proof-stars">★★★★★</div>
+          <p class="proof-text">"Transferred a 5GB video in under 2 minutes. Nothing else comes close on LAN speed. Absolutely incredible."</p>
+          <div class="proof-author">
+            <div class="proof-avatar">A</div>
+            <div>
+              <div class="proof-name">Akash</div>
+              <div class="proof-role">Android User</div>
+            </div>
+          </div>
+        </div>
+        <div class="proof-card reveal delay-2">
+          <div class="proof-stars">★★★★★</div>
+          <p class="proof-text">"The clipboard sharing is a game changer. Copy on my phone, paste on my Mac — instantly. No app does this so seamlessly."</p>
+          <div class="proof-author">
+            <div class="proof-avatar">R</div>
+            <div>
+              <div class="proof-name">Razeek</div>
+              <div class="proof-role">macOS & Android User</div>
+            </div>
+          </div>
+        </div>
+        <div class="proof-card reveal delay-3">
+          <div class="proof-stars">★★★★★</div>
+          <p class="proof-text">"Works perfectly on our university network where AirDrop and SHAREit fail. The unicast handshake actually bypasses our firewall."</p>
+          <div class="proof-author">
+            <div class="proof-avatar">S</div>
+            <div>
+              <div class="proof-name">Surya</div>
+              <div class="proof-role">CS Student</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       CTA SECTION
+       ══════════════════════════════════════════════════════════════════════ -->
+  <section class="cta-section">
+    <div class="container">
+      <div class="cta-box reveal-scale">
+        <h2>Ready to <span class="gradient-text">Drop the Cloud?</span></h2>
+        <p>Download ClipLAN and start sharing files at the speed your hardware was meant to deliver.</p>
+        <div class="cta-actions">
+          <a href="#download" class="btn btn-primary">
+            <span class="btn-icon">⬇</span>
+            Download Now
+          </a>
+          <a href="https://github.com" target="_blank" class="btn btn-outline">
+            <span class="btn-icon">⭐</span>
+            Star on GitHub
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       CONTACT US
+       ══════════════════════════════════════════════════════════════════════ -->
+  <section class="contact-section section" id="contact">
+    <div class="container">
+      <div class="section-header reveal">
+        <div class="section-label">Get in Touch</div>
+        <h2 class="section-title">Contact <span class="gradient-text">Us</span></h2>
+        <p class="section-subtitle">Have questions, feedback, or need support? We'd love to hear from you.</p>
+      </div>
+      <div class="contact-card reveal delay-1">
+        <form action="mailto:abdulrazeek2006@gmail.com" method="GET" enctype="text/plain" class="contact-form">
+          <div class="form-group">
+            <label for="subject">Subject</label>
+            <input type="text" id="subject" name="subject" placeholder="How can we help you?" required>
+          </div>
+          <div class="form-group">
+            <label for="body">Message</label>
+            <textarea id="body" name="body" rows="5" placeholder="Write your message here..." required></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; font-size: 1.1rem; padding: 14px;">
+            <span class="btn-icon">✉</span> Send Message
+          </button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       FOOTER
+       ══════════════════════════════════════════════════════════════════════ -->
+  <footer class="footer" id="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="#" class="nav-brand">
+            <img src="assets/logo.jpeg" alt="ClipLAN Logo">
+            <span>ClipLAN</span>
+          </a>
+          <p>Blazing fast, serverless, peer-to-peer file sharing. Built with Flutter. Open source and free forever.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Product</h4>
+          <a href="#features">Features</a>
+          <a href="#how-it-works">How It Works</a>
+          <a href="#tech">Technology</a>
+          <a href="#download">Download</a>
+        </div>
+        <div class="footer-col">
+          <h4>Resources</h4>
+          <a href="https://github.com" target="_blank">GitHub</a>
+          <a href="#showcase">Screenshots</a>
+          <a href="#comparison">Comparison</a>
+          <a href="#reviews">Reviews</a>
+        </div>
+        <div class="footer-col">
+          <h4>Legal</h4>
+          <a href="#" onclick="openModal('privacyModal'); return false;">Privacy Policy</a>
+          <a href="#" onclick="openModal('termsModal'); return false;">Terms & Conditions</a>
+          <a href="mailto:abdulrazeek2006@gmail.com">Contact</a>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <p>Designed & Developed by Abdul Razeek A, Akash R, Aaron Michael Raj, Akash N.</p>
+        <p style="margin-top: 8px;">&copy; 2026 ClipLAN. All rights reserved. Built with ❤️ using Flutter.</p>
+        <div class="footer-socials" style="margin-top: 16px;">
+          <a href="https://github.com" target="_blank" aria-label="GitHub">⭐</a>
+          <a href="mailto:abdulrazeek2006@gmail.com" aria-label="Email">✉</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Legal Modals -->
+  <div class="modal-overlay" id="privacyModal">
+    <div class="modal-content" style="max-width: 600px; text-align: left;">
+      <h3 style="margin-bottom: 20px;">Privacy Policy</h3>
+      <div style="max-height: 400px; overflow-y: auto; font-size: 0.95rem; line-height: 1.6; margin-bottom: 20px; padding-right: 10px; color: var(--text-secondary);">
+        <p style="margin-bottom: 12px;"><strong>1. Offline Transfer:</strong> ClipLAN is designed to function completely offline on your local network. We do not transmit your files, clipboard data, or personal information to any external servers.</p>
+        <p style="margin-bottom: 12px;"><strong>2. Data Collection:</strong> We do not collect, store, or sell any telemetry or user usage data. All connections are direct peer-to-peer (P2P).</p>
+        <p style="margin-bottom: 12px;"><strong>3. Security:</strong> File transfers happen strictly over your local WiFi or Hotspot. We recommend securing your local network, as ClipLAN relies on LAN-level security protocols.</p>
+      </div>
+      <div class="modal-actions" style="justify-content: flex-end;">
+        <button class="btn btn-primary" onclick="closeModal('privacyModal')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="termsModal">
+    <div class="modal-content" style="max-width: 600px; text-align: left;">
+      <h3 style="margin-bottom: 20px;">Terms & Conditions</h3>
+      <div style="max-height: 400px; overflow-y: auto; font-size: 0.95rem; line-height: 1.6; margin-bottom: 20px; padding-right: 10px; color: var(--text-secondary);">
+        <p style="margin-bottom: 12px;"><strong>1. Acceptance of Terms:</strong> By downloading and using ClipLAN, you agree to these terms.</p>
+        <p style="margin-bottom: 12px;"><strong>2. Open Source:</strong> ClipLAN is provided as-is without warranties. It is an open-source project and subject to the respective open-source licenses.</p>
+        <p style="margin-bottom: 12px;"><strong>3. Liability:</strong> The developers (Abdul Razeek A, Akash R, Aaron Michael Raj, Akash N) are not liable for any data loss, network breaches, or issues arising from the use of this software.</p>
+      </div>
+      <div class="modal-actions" style="justify-content: flex-end;">
+        <button class="btn btn-primary" onclick="closeModal('termsModal')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="macInstallModal">
+    <div class="modal-content" style="max-width: 600px; text-align: left;">
+      <h3 style="margin-bottom: 20px;">macOS Installation Guide</h3>
+      <div style="max-height: 400px; overflow-y: auto; font-size: 0.95rem; line-height: 1.6; margin-bottom: 20px; padding-right: 10px; color: var(--text-secondary);">
+        <p style="margin-bottom: 12px;">Because ClipLAN is a free, open-source application distributed outside the Mac App Store, macOS Gatekeeper may show a warning that it "cannot be verified". This is completely normal.</p>
+        <p style="margin-bottom: 8px;"><strong>To bypass this warning:</strong></p>
+        <ol style="margin-left: 20px; margin-bottom: 12px;">
+          <li style="margin-bottom: 8px;">Drag ClipLAN into your <strong>Applications</strong> folder.</li>
+          <li style="margin-bottom: 8px;"><strong>Do not double-click it.</strong> Instead, <strong>Right-click</strong> (or Control-click) the ClipLAN app.</li>
+          <li style="margin-bottom: 8px;">Select <strong>"Open"</strong> from the context menu.</li>
+          <li style="margin-bottom: 8px;">The warning will appear again, but this time it will have an <strong>"Open"</strong> button. Click it.</li>
+        </ol>
+        <p><em>Note: You only need to do this the very first time. Afterward, you can double-click it normally!</em></p>
+      </div>
+      <div class="modal-actions" style="justify-content: flex-end;">
+        <button class="btn btn-primary" onclick="closeModal('macInstallModal')">Got it</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       DOWNLOAD MODAL
+       ══════════════════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="downloadModal">
+    <div class="modal-content">
+      <h3 id="modalTitle">Download ClipLAN</h3>
+      <p id="modalDesc">Your download will begin shortly.</p>
+      <div class="modal-actions" id="modalActions"></div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="app.js"></script>
+</body>
+</html>

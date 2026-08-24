@@ -1,0 +1,316 @@
+================================================================================
+          CLIPLAN - HIGH-LEVEL WORKING & DATA ARCHITECTURE
+================================================================================
+
+1. OVERVIEW
+--------------------------------------------------------------------------------
+ClipLAN (`cliplan`) is an open-source, serverless, peer-to-peer (P2P) local area
+network (LAN) file sharing and real-time shared clipboard application built using
+Flutter and Dart.
+
+Key Highlights:
+  - 100% Serverless: Operates entirely without internet access, external cloud servers,
+    or manual Bluetooth pairing.
+  - Zero-Configuration Discovery: Discovers devices on local Wi-Fi automatically using
+    UDP broadcasting and dual-multicast (`224.0.0.1` & `224.0.0.251`).
+  - High-Performance Stream Reader: Uses an O(1) memory SocketReader operating with
+    10 MB buffer chunks over TCP sockets to prevent CPU locks or RAM spikes.
+  - End-to-End Integrity: Real-time SHA-256 cryptographic checksum computation and
+    verification on the fly.
+  - Cross-Platform Support: Mobile (Android, iOS) and Desktop (macOS).
+
+
+2. HIGH-LEVEL WORKING PRINCIPLE & SYSTEM FLOWS
+--------------------------------------------------------------------------------
+
+A. DEVICE DISCOVERY FLOW (UDP Engine - Port 53317)
+  1. Initialization: The app binds a `RawDatagramSocket` on IPv4 port 53317 with socket
+     reuse enabled (`reuseAddress: true`, `reusePort: true`) and self-healing auto-rebind.
+  2. Multicast Join: Joins Multicast IGMP groups `224.0.0.1` and `224.0.0.251` to ensure
+     discovery works even on routers blocking standard broadcast addresses.
+  3. Announcement Heartbeats: A 2-second periodic timer broadcasts a JSON presence packet
+     containing device ID, name, local IP, transfer server port, and platform.
+  4. Multi-Destination & Unicast Transmission: Sent simultaneously to:
+       a) Global Broadcast: `255.255.255.255`
+       b) Multicast Groups: `224.0.0.1` and `224.0.0.251`
+       c) Subnet Broadcasts: Calculated for all active IPv4 interfaces (e.g. `192.168.1.255`)
+       d) Direct Unicast Heartbeats: Targeted directly to all active previously seen peer IPs.
+  5. Instant Unicast Handshake Response: When a device receives an `announce` packet from a new peer,
+     it immediately sends a targeted unicast presence response back to the sender's IP, guaranteeing
+     0-latency bi-directional discovery even on strict routers.
+  6. Resilient Garbage Collection: A 3-second periodic cleanup timer removes stale devices only after
+     15 seconds of inactivity (increased from 8s to eliminate Wi-Fi drop flickering).
+
+B. SHARED CLIPBOARD FLOW (UDP Engine - Port 53317)
+  1. Broadcast: User enters or submits a text snippet. The app packages it into a
+     `clipboard` type UDP JSON message and broadcasts it across the network.
+  2. Receive & Prompt: Remote devices receive the datagram, add it to `sharedClipboards`
+     history, and trigger an optional auto-copy or approval prompt to write to system clipboard.
+
+C. FILE TRANSFER FLOW (TCP Engine - Port 53318)
+  1. Server Startup: Recipient device starts a `ServerSocket` on TCP port 53318 (or an
+     ephemeral fallback port) and listens for incoming socket connections.
+  2. Handshake / Request (`transfer_request`): Sender opens a TCP connection to recipient IP:Port
+     and sends a length-prefixed JSON header detailing file metadata (names, sizes, MIME types).
+  3. Pre-Transfer Cryptographic Hashing: Sender calculates SHA-256 digests for each file upfront.
+  4. User Approval Phase: Recipient shows an interactive modal (`approval_sheet`).
+     If rejected -> `transfer_response` sent with `accepted: false`, socket closed.
+     If accepted -> `transfer_response` sent with `accepted: true`.
+  5. Streaming Data Transmission:
+     - Sender transmits `file_start` JSON frame with file index, size, and SHA-256 hash.
+     - Sender streams raw binary bytes in 10 MB chunks.
+     - Recipient reads chunks using `SocketReader` (O(1) memory queue), writes directly to
+       disk, and updates a running SHA-256 digest sink simultaneously.
+     - Sender transmits `file_end` JSON frame.
+     - Recipient compares calculated SHA-256 digest against expected checksum, sends `file_ack`.
+  6. Finalization (`transfer_complete`): Upon receiving all files, sender transmits completion packet.
+     Recipient closes socket and logs transfer in history.
+
+
+3. AVAILABLE DATA & DATA SCHEMAS
+--------------------------------------------------------------------------------
+
+A. NETWORK WIRE PROTOCOL (JSON DATA PACKETS)
+
+  1. UDP Announcement Packet (`type: announce`):
+     {
+       "type": "announce",
+       "id": "uuid-v4-string",
+       "name": "User's Phone",
+       "ip": "192.168.1.45",
+       "port": 53318,
+       "platform": "android" | "ios" | "unknown"
+     }
+
+  2. UDP Clipboard Packet (`type: clipboard`):
+     {
+       "type": "clipboard",
+       "id": "uuid-v4-string",
+       "name": "User's Laptop",
+       "text": "https://example.com/share-code"
+     }
+
+  3. TCP Transfer Request (`type: transfer_request`):
+     {
+       "type": "transfer_request",
+       "id": "transfer-uuid-v4",
+       "senderName": "MacBook Pro",
+       "files": [
+         {
+           "name": "document.pdf",
+           "size": 5242880,
+           "mime": "application/pdf"
+         }
+       ]
+     }
+
+  4. TCP Transfer Response (`type: transfer_response`):
+     {
+       "type": "transfer_response",
+       "id": "transfer-uuid-v4",
+       "accepted": true | false
+     }
+
+  5. TCP File Start Frame (`type: file_start`):
+     {
+       "type": "file_start",
+       "id": "transfer-uuid-v4",
+       "fileIndex": 0,
+       "name": "document.pdf",
+       "size": 5242880,
+       "checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+     }
+
+  6. TCP File End Frame (`type: file_end`):
+     {
+       "type": "file_end",
+       "id": "transfer-uuid-v4",
+       "fileIndex": 0
+     }
+
+  7. TCP File Acknowledgment (`type: file_ack`):
+     {
+       "type": "file_ack",
+       "id": "transfer-uuid-v4",
+       "fileIndex": 0,
+       "checksumValid": true
+     }
+
+  8. TCP Transfer Complete (`type: transfer_complete`):
+     {
+       "type": "transfer_complete",
+       "id": "transfer-uuid-v4"
+     }
+
+B. IN-MEMORY DATA MODELS
+
+  1. DeviceInfo (`lib/models/device_info.dart`):
+     - `id`: String (UUID v4)
+     - `name`: String (User-defined device label)
+     - `ip`: String (IPv4 address)
+     - `port`: int (TCP transfer port)
+     - `platform`: String (android / ios / unknown)
+     - `lastSeen`: DateTime (Timestamp of last received UDP heartbeat)
+
+  2. TransferItem (`lib/models/transfer_item.dart`):
+     - `id`: String (Transfer session ID)
+     - `deviceName`: String (Remote device display name)
+     - `deviceIp`: String (Remote device IP address)
+     - `direction`: TransferDirection (sending | receiving)
+     - `files`: List<FileItem> (List of files in current batch)
+     - `status`: TransferStatus (pending, waitingApproval, transferring, verifying, completed, failed, cancelled)
+     - `currentFileIndex`: int (Active file index being transferred)
+     - `bytesTransferred`: int (Cumulative total bytes read/written)
+     - `errorMessage`: String? (Error cause if status == failed)
+     - `startTime`: DateTime (Transfer start timestamp)
+     - `endTime`: DateTime? (Transfer completion timestamp)
+     - `socket`: Socket? (Active TCP socket handle)
+     - `checksumValid`: bool (Data integrity flag)
+
+  3. FileItem (`lib/models/transfer_item.dart`):
+     - `name`: String (Original file name with extension)
+     - `size`: int (File size in bytes)
+     - `mime`: String? (Guessed MIME type)
+     - `path`: String? (Local disk file path on sender/receiver)
+     - `checksum`: String? (Hexadecimal SHA-256 string)
+
+C. LOCAL PERSISTENT STORAGE (Hive NoSQL Database)
+
+  1. Settings Box (`settings`):
+     - `deviceName`: String (Default: 'My Device')
+     - `deviceId`: String (Persistent UUID v4 generated on first launch)
+     - `savePath`: String (Default path: `<Documents>/ClipLAN`)
+     - `requireApproval`: bool (Default: true)
+     - `hasCompletedSetup`: bool (Default: false)
+
+  2. History Box (`history`):
+     - Stores serialized JSON objects of completed/cancelled/failed `TransferItem` records.
+     - Sorted descending by `startTime`.
+
+
+4. APP STATE MANAGEMENT & REACTIVE CONTROLLERS
+--------------------------------------------------------------------------------
+Managed centrally via `AppState` (`lib/providers/app_state.dart`) using `ChangeNotifier`:
+  - `devices`: Reactive list of active LAN peers.
+  - `activeTransfers`: List of currently ongoing/pending transfer sessions.
+  - `history`: List of historical transfer records loaded from Hive.
+  - `sharedClipboards`: Synchronized network clipboard stream buffer.
+  - `isDiscovering`: Boolean indicating UDP engine status.
+  - `isServerRunning`: Boolean indicating TCP server status.
+
+
+5. UI SCREENS & INTERACTION FLOWS
+--------------------------------------------------------------------------------
+1. Radar Discovery Home (`home_screen.dart` / `devices_screen.dart`):
+   - Center radar visual displaying nearby discovered devices in real time.
+   - Device cards displaying OS icon, IP address, device name, and connection state.
+2. File Browser Screen (`file_browser_screen.dart`):
+   - Categorized view of local media, documents, and storage for batch file selection.
+3. Transfer Progress Cards (`transfer_card.dart`):
+   - Real-time progress bar, speed tracker (MB/s), file count, and status badge.
+4. Approval Modal (`approval_sheet.dart`):
+   - Bottom sheet prompt for incoming file transfer requests (Accept / Reject buttons).
+5. Shared Clipboard Sheet (`shared_clipboard_sheet.dart`):
+   - UI snippet receiver list with one-tap copy and network broadcast options.
+6. Settings Screen (`settings_screen.dart`):
+   - Device renaming, download folder path selector, auto-approval toggle, and history clearer.
+
+
+6. CRYPTOGRAPHY, SYSTEM LIMITS & DATA RANGE SPECIFICATION
+--------------------------------------------------------------------------------
+
+A. CHECKSUM & CRYPTOGRAPHIC HASHING
+   - Algorithm: SHA-256 (256-bit Secure Hash Algorithm) from Dart `package:crypto/crypto.dart`.
+   - Sender-Side Hashing: Calculates full-file SHA-256 digest upfront (`sha256.convert(bytes)`) and embeds the hexadecimal checksum string in the `file_start` header frame.
+   - Receiver-Side Hashing: Streams incoming 10 MB chunks on-the-fly directly into `sha256.startChunkedConversion(digestSink)` while simultaneously writing to disk.
+   - Integrity Validation: Extracts actual digest upon stream completion and compares it against expected checksum to emit `checksumValid` in `file_ack`.
+
+B. AVAILABLE DEVICE LIMITS
+   - Software State Limit: UNLIMITED (No hardcoded bounds in `DiscoveryService` or `AppState`). Peers stored dynamically in `Map<String, DeviceInfo>`.
+   - Network Infrastructure Capacity: Bound only by local IPv4 subnet space:
+       * /24 Subnet (e.g., 192.168.1.x): Supports up to 254 active host IPs.
+       * /16 Subnet (e.g., 10.0.x.x): Supports up to 65,534 active host IPs.
+   - Pruning Threshold: Devices failing to send UDP heartbeats for > 8 seconds are purged automatically.
+
+C. DATA SIZE LIMITS
+   - Control Packet Max Limit: 10 MB maximum payload cap per TCP JSON message frame (`readMessage()` security boundary).
+   - File & Batch Transfer Limit: UNLIMITED (Tested on gigabyte-scale transfers). O(1) memory chunked streaming (10 MB buffer blocks) ensures memory consumption remains static regardless of file size. Bound strictly by available disk space.
+
+D. DATA TRANSFER RANGE
+   - Indoor Wi-Fi Coverage: ~30 meters (100 feet) through typical indoor walls (802.11a/b/g/n/ac/ax routers).
+   - Outdoor Line-of-Sight Range: ~100 meters (300+ feet) under clear line-of-sight conditions.
+   - Wired Ethernet LAN Range: Up to 100 meters (328 feet) per Cat5e/Cat6 cable run.
+   - Location Constraints: No physical proximity restriction (unlike Bluetooth/NFC); functions across rooms, floors, or buildings sharing the same local Wi-Fi subnet.
+
+
+================================================================================
+                              END OF SPECIFICATION
+================================================================================
+
+
+================================================================================
+Q&A: Centralized College WiFi & Cross-Router Discovery
+================================================================================
+
+Q: Does the application work on WiFi across multiple routers in a large college centralized WiFi network? Can a user share data with another user connected to a different router on the same centralized WiFi? If no, is the implementation easier or difficult, and why?
+
+A: 
+It depends on how the college network is configured. The application uses UDP Broadcasts for device discovery.
+
+1. Single Subnet (Yes): 
+If the multiple routers/access points are bridged together so that the entire college operates on a single large subnet (broadcast domain), the application WILL work. UDP broadcast packets will reach all devices, allowing them to discover each other and transfer data.
+
+2. Multiple Subnets (No): 
+Large institutions usually segment their network into multiple subnets or VLANs (e.g., separating different buildings, student vs. staff networks) to reduce broadcast traffic. Routers, by default, block UDP broadcast packets from crossing subnet boundaries. If User A and User B are on different subnets, they will NOT discover each other.
+
+If they cannot discover each other, is the implementation to fix this easy or difficult?
+Answer: DIFFICULT.
+
+Why is it difficult?
+- Blocked Broadcasts: You cannot bypass the router rules that block broadcasts. To discover devices across subnets, you would have to abandon the purely "Serverless / P2P Local" architecture.
+- Central Server Requirement: You would need to build and host a centralized Signaling Server (on the internet or a central campus IP). Devices would connect to this server to register their IP addresses and find each other. This adds infrastructure costs, privacy concerns, and maintenance.
+- NAT / Firewalls: Even if devices discover each other IPs via a central server, enterprise networks often have strict Firewalls and NAT (Network Address Translation) policies that block direct TCP peer-to-peer connections between subnets. You would then need to implement complex NAT Traversal techniques (STUN/TURN servers) or relay the file traffic through an external server, defeating the purpose of a fast, local network file share.
+
+--------------------------------------------------------------------------------
+Follow-up Scenario: Centralized Intranet Server
+--------------------------------------------------------------------------------
+
+Q: My college uses an IP like 172.16.1.2 that I can type in the address bar and connect to from anywhere on campus if the WiFi signal appears. Does this mean the app will work?
+
+A: 
+Not necessarily. 
+
+Being able to access a central web page or intranet server (like 172.16.1.2) from anywhere on campus only proves that the college routers are properly configured to route standard "Unicast" traffic (like HTTP web requests) to that specific server.
+
+However, the application relies on "UDP Broadcasts" to automatically discover other devices without needing a central server. Network routers handle Unicast (1-to-1) and Broadcast (1-to-all) traffic very differently:
+
+- Scenario A (It WILL work): If the college puts everyone on the exact same large subnet (for example, every student gets an IP address starting with 172.16.X.X), then you share the same broadcast domain. UDP broadcasts will reach everyone, and the app will work flawlessly.
+  
+- Scenario B (It will NOT work): If the college assigns different buildings or access points to different subnets (e.g., Building A gets 10.1.X.X and Building B gets 10.2.X.X), BOTH buildings can still easily route web traffic to the central 172.16.1.2 server. BUT, the routers will strictly block UDP broadcast packets from crossing between 10.1.X.X and 10.2.X.X. In this case, the devices will not discover each other.
+
+Summary: 
+The ability to reach a centralized campus IP does not guarantee Peer-to-Peer discovery will work. It still entirely depends on whether the college uses a single massive subnet (works) or segments the network into multiple smaller subnets (fails).
+
+================================================================================
+7. RECENT ARCHITECTURAL UPGRADES (v1.1)
+================================================================================
+
+A. ZERO-COPY STREAMING & DYNAMIC OOM BACKPRESSURE (MAX SPEED ALGORITHM)
+   - The TCP engine has been entirely rewritten to bypass memory allocation (`readExact` chunking).
+   - It now uses `streamBytesTo`, which grabs the raw, dynamically sized TCP packets directly from the OS socket and instantly pipes them into the physical disk writer (`IOSink.add`).
+   - Crash Protection: To prevent Out-Of-Memory (OOM) crashes on devices where the Wi-Fi speed (e.g. 50 MB/s) exceeds the disk write speed (e.g. 15 MB/s), the system dynamically tracks byte flow. Every time the exact throughput crosses 10 MB, it synchronously triggers `await sink.flush()`.
+   - Pipeline Optimization: If the buffer drains below 2MB, the socket listener is actively resumed *while* disk writing occurs, guaranteeing continuous parallel pipeline execution without network starvation.
+
+B. WAKELOCK STABILITY
+   - Massive gigabyte file transfers can take several minutes.
+   - Issue: If the device screen sleeps, the CPU suspends the app, dropping active TCP sockets and corrupting transfers.
+   - Solution: Integrated `wakelock_plus`. The `TransferService` maintains an active `_activeTransferCount`. When a transfer begins, it forces a CPU wakelock to keep the OS alive. Once the transfer count hits 0 (completed or failed), the wakelock is safely released.
+
+C. HISTORY RETRY ENGINE & RECENTS FOLDER
+   - Issue: Previously, the local `path` of sent files was not serialized to the Hive NoSQL database, causing file "Retry" attempts to fail after an app restart.
+   - Solution: Upgraded `FileItem` serialization to persistently save absolute file paths.
+   - New Feature: Built a "Recents" tab in the File Browser that queries the history database, verifies physical file existence, and allows 1-tap re-sending of historical files.
+
+D. MACOS SANDBOX ESCAPE
+   - Issue: macOS App Sandbox restricts the app from accessing arbitrary user files or saving to the global Downloads folder without constant user permission dialogs.
+   - Solution: Disabled `com.apple.security.app-sandbox` in both `DebugProfile.entitlements` and `Release.entitlements` to guarantee seamless file browsing and saving without POSIX permission errors.

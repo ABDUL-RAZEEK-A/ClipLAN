@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terms & Conditions — ClipLAN</title>
+  <meta name="description" content="ClipLAN Terms and Conditions. Understand the terms of using our open-source P2P file sharing application.">
+  <link rel="icon" href="assets/logo.jpeg" type="image/jpeg">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .legal-page { padding: calc(var(--nav-height) + 60px) 0 80px; background: var(--bg); min-height: 100vh; }
+    .legal-container { max-width: 800px; margin: 0 auto; padding: 0 24px; }
+    .legal-header { margin-bottom: 48px; }
+    .legal-header h1 { font-size: clamp(2rem, 4vw, 3rem); margin-bottom: 12px; }
+    .legal-header .date { color: var(--text-muted); font-size: 0.9rem; }
+    .legal-content h2 {
+      font-size: 1.4rem; margin-top: 48px; margin-bottom: 16px;
+      padding-bottom: 8px; border-bottom: 1px solid var(--border);
+      color: var(--primary-light);
+    }
+    .legal-content p { margin-bottom: 16px; color: var(--text-secondary); line-height: 1.9; }
+    .legal-content ul { margin: 16px 0; padding-left: 24px; }
+    .legal-content li { margin-bottom: 8px; color: var(--text-secondary); line-height: 1.8; list-style: disc; }
+    .legal-content strong { color: var(--text-primary); }
+    .back-link {
+      display: inline-flex; align-items: center; gap: 8px;
+      margin-bottom: 32px; color: var(--primary-light);
+      font-weight: 500; transition: gap 0.3s ease;
+    }
+    .back-link:hover { gap: 12px; }
+    .legal-highlight {
+      padding: 24px; background: rgba(59,130,246,0.05);
+      border-left: 3px solid var(--primary-light);
+      border-radius: 0 var(--radius-md) var(--radius-md) 0;
+      margin: 24px 0;
+    }
+    .legal-highlight p { margin-bottom: 0; color: var(--text-primary); font-weight: 500; }
+  </style>
+</head>
+<body>
+
+  <!-- NAVIGATION -->
+  <nav class="navbar scrolled" id="navbar">
+    <div class="container">
+      <a href="index.html" class="nav-brand">
+        <img src="assets/logo.jpeg" alt="ClipLAN Logo">
+        <span>ClipLAN</span>
+      </a>
+      <div class="nav-links" id="navLinks">
+        <a href="index.html#features">Features</a>
+        <a href="index.html#download">Download</a>
+        <a href="privacy.html">Privacy</a>
+        <a href="terms.html" class="active">Terms</a>
+        <a href="index.html#download" class="nav-cta">Download</a>
+      </div>
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <div class="legal-page">
+    <div class="legal-container">
+      <a href="index.html" class="back-link">← Back to Home</a>
+
+      <div class="legal-header">
+        <h1>Terms & <span class="gradient-text">Conditions</span></h1>
+        <p class="date">Last updated: August 22, 2026</p>
+      </div>
+
+      <div class="legal-highlight">
+        <p>📄 By downloading or using ClipLAN, you agree to these terms. ClipLAN is free, open-source software provided "as-is" without warranty.</p>
+      </div>
+
+      <div class="legal-content">
+        <h2>1. Acceptance of Terms</h2>
+        <p>By downloading, installing, or using ClipLAN ("the App"), you agree to be bound by these Terms and Conditions ("Terms"). If you do not agree to these Terms, do not use the App.</p>
+
+        <h2>2. Description of Service</h2>
+        <p>ClipLAN is an open-source, peer-to-peer (P2P) file sharing and real-time clipboard application. The App operates entirely on local area networks (LAN) without any internet connectivity, cloud servers, or centralized infrastructure. Key functionalities include:</p>
+        <ul>
+          <li>Discovering nearby devices on the same local network via UDP multicast</li>
+          <li>Transferring files of any size directly between devices via TCP sockets</li>
+          <li>Sharing clipboard text across devices in real-time</li>
+          <li>Verifying file integrity with SHA-256 cryptographic checksums</li>
+          <li>Maintaining transfer history locally on the device</li>
+        </ul>
+
+        <h2>3. License</h2>
+        <p>ClipLAN is released as open-source software. You are granted a non-exclusive, worldwide, royalty-free license to:</p>
+        <ul>
+          <li>Use the App for personal and commercial purposes</li>
+          <li>Copy, modify, and distribute the source code</li>
+          <li>Create derivative works based on the App</li>
+        </ul>
+        <p>This license is subject to the terms of the applicable open-source license included with the source code repository.</p>
+
+        <h2>4. User Responsibilities</h2>
+        <p>When using ClipLAN, you agree to:</p>
+        <ul>
+          <li><strong>Use the App lawfully:</strong> You will not use ClipLAN to transfer copyrighted, illegal, malicious, or harmful content.</li>
+          <li><strong>Respect others' privacy:</strong> You will not use the App to send unsolicited files to other devices without consent.</li>
+          <li><strong>Use trusted networks:</strong> Since transfers are not encrypted end-to-end, you should only use ClipLAN on networks you trust.</li>
+          <li><strong>Verify file integrity:</strong> While ClipLAN performs SHA-256 verification, you should exercise caution when opening received files from unknown sources.</li>
+          <li><strong>Keep your device secure:</strong> Maintain appropriate security measures on your device, including up-to-date operating system software.</li>
+        </ul>
+
+        <h2>5. No Warranty</h2>
+        <p>ClipLAN is provided <strong>"AS IS"</strong> and <strong>"AS AVAILABLE"</strong> without warranty of any kind, whether express, implied, statutory, or otherwise. We specifically disclaim all implied warranties of:</p>
+        <ul>
+          <li>Merchantability</li>
+          <li>Fitness for a particular purpose</li>
+          <li>Non-infringement</li>
+          <li>Accuracy or reliability</li>
+        </ul>
+        <p>We do not warrant that the App will be uninterrupted, error-free, secure, or free of viruses or other harmful components.</p>
+
+        <h2>6. Limitation of Liability</h2>
+        <p>To the maximum extent permitted by applicable law, in no event shall the developers of ClipLAN be liable for any:</p>
+        <ul>
+          <li>Direct, indirect, incidental, special, consequential, or punitive damages</li>
+          <li>Loss of data, profits, revenue, or business opportunities</li>
+          <li>Damage to devices, hardware, or software</li>
+          <li>File corruption, data loss, or transfer failures</li>
+          <li>Unauthorized access to transferred files on untrusted networks</li>
+        </ul>
+        <p>This limitation applies regardless of the theory of liability (contract, tort, negligence, strict liability, or otherwise), even if we have been advised of the possibility of such damages.</p>
+
+        <h2>7. Network Security Disclaimer</h2>
+        <p>ClipLAN operates over local area networks using unencrypted TCP and UDP protocols. While file integrity is verified using SHA-256 checksums, the data in transit is <strong>not encrypted</strong>. Users should be aware that:</p>
+        <ul>
+          <li>Other devices on the same network may potentially intercept transferred data</li>
+          <li>The App is designed for use on trusted private networks (home, office)</li>
+          <li>Using the App on public or untrusted networks is done at your own risk</li>
+          <li>The UDP discovery mechanism broadcasts your device name on the local network</li>
+        </ul>
+
+        <h2>8. File Content Responsibility</h2>
+        <p>You are solely responsible for the content of files you transfer using ClipLAN. The App is merely a tool for peer-to-peer data transfer and does not inspect, filter, or moderate the content of transferred files. You must ensure that any files you send or receive comply with all applicable laws and regulations.</p>
+
+        <h2>9. Intellectual Property</h2>
+        <p>The ClipLAN name, logo, and branding are the property of the ClipLAN project. While the source code is open-source, the ClipLAN brand identity may not be used in ways that suggest official endorsement or affiliation without prior written permission.</p>
+
+        <h2>10. Third-Party Software</h2>
+        <p>ClipLAN uses the following open-source libraries and frameworks, each subject to their respective licenses:</p>
+        <ul>
+          <li><strong>Flutter Framework</strong> — Google (BSD-3-Clause)</li>
+          <li><strong>Dart SDK</strong> — Google (BSD-3-Clause)</li>
+          <li><strong>Hive Database</strong> — (Apache-2.0)</li>
+          <li><strong>Provider</strong> — Remi Rousselet (MIT)</li>
+          <li><strong>wakelock_plus</strong> — (BSD-3-Clause)</li>
+          <li><strong>crypto</strong> — Dart Team (BSD-3-Clause)</li>
+        </ul>
+
+        <h2>11. Modifications to Terms</h2>
+        <p>We reserve the right to modify these Terms at any time. Changes will be posted on this page with an updated revision date. Your continued use of the App after any modifications constitutes acceptance of the updated Terms.</p>
+
+        <h2>12. Termination</h2>
+        <p>You may stop using ClipLAN at any time by simply uninstalling the App. Since we don't collect any data, there are no accounts to delete or data to request removal of. All locally stored data (history, settings, clipboard) is deleted when you uninstall the App.</p>
+
+        <h2>13. Governing Law</h2>
+        <p>These Terms shall be governed by and construed in accordance with applicable local laws. Any disputes arising from these Terms or your use of the App shall be resolved through appropriate legal channels in your jurisdiction.</p>
+
+        <h2>14. Severability</h2>
+        <p>If any provision of these Terms is found to be unenforceable or invalid, that provision shall be limited or eliminated to the minimum extent necessary, and the remaining provisions shall remain in full force and effect.</p>
+
+        <h2>15. Contact</h2>
+        <p>For any questions regarding these Terms, please contact us:</p>
+        <ul>
+          <li>Email: <a href="mailto:contact@cliplan.app" style="color:var(--primary-light)">contact@cliplan.app</a></li>
+          <li>GitHub: <a href="https://github.com" target="_blank" style="color:var(--primary-light)">github.com/cliplan</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-bottom" style="border-top:none;padding-top:0;">
+        <p>&copy; 2026 ClipLAN. All rights reserved.</p>
+        <div class="footer-socials">
+          <a href="index.html">Home</a>
+          <a href="privacy.html">Privacy</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const navToggle = document.getElementById('navToggle');
+    const navLinks = document.getElementById('navLinks');
+    navToggle.addEventListener('click', () => {
+      navToggle.classList.toggle('open');
+      navLinks.classList.toggle('open');
+    });
+  </script>
+</body>
+</html>
