@@ -1,0 +1,48 @@
+name: cliplan
+description: "ClipLAN - Local file sharing"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  provider: ^6.1.2
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  file_picker: ^11.0.0
+  path_provider: ^2.1.5
+  crypto: ^3.0.6
+  google_fonts: ^6.2.1
+  flutter_animate: ^4.5.2
+  uuid: ^4.5.1
+  intl: ^0.19.0
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^7.4.0
+  permission_handler: ^11.3.1
+  wakelock_plus: ^1.5.2
+  image_picker: ^1.1.2
+  device_info_plus: ^10.1.2
+  receive_sharing_intent: ^1.7.0
+  installed_apps: ^1.6.0
+  open_filex: ^4.5.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter:
+  uses-material-design: true
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  macos:
+    generate: true
+  image_path: "app_logo/logo.jpeg"
+  min_sdk_android: 21
+  remove_alpha_ios: true

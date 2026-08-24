@@ -1,0 +1,41 @@
+graph TD
+    %% Styling
+    classDef ui fill:#4A90E2,stroke:#003366,stroke-width:2px,color:white;
+    classDef state fill:#F5A623,stroke:#8B572A,stroke-width:2px,color:white;
+    classDef service fill:#7ED321,stroke:#417505,stroke-width:2px,color:black;
+    classDef system fill:#9B9B9B,stroke:#4A4A4A,stroke-width:2px,color:white;
+
+    subgraph "Device A (Sender)"
+        direction TB
+        UI_A["Flutter UI<br/>(File Browser/Clipboard)"]:::ui
+        State_A["AppState"]:::state
+        Disc_A["DiscoveryService"]:::service
+        Trans_A["TransferService"]:::service
+        Sys_A["Local File System / Permissions"]:::system
+        
+        UI_A --> State_A
+        State_A --> Disc_A
+        State_A --> Trans_A
+        Trans_A --> Sys_A
+    end
+
+    subgraph "Device B (Receiver)"
+        direction TB
+        UI_B["Flutter UI<br/>(Home/Transfers)"]:::ui
+        State_B["AppState"]:::state
+        Disc_B["DiscoveryService"]:::service
+        Trans_B["TransferService"]:::service
+        Sys_B["Local File System / Wakelock"]:::system
+        
+        UI_B --> State_B
+        State_B --> Disc_B
+        State_B --> Trans_B
+        Trans_B --> Sys_B
+    end
+
+    %% Network Interactions
+    Disc_A -. "UDP Broadcast (53317)<br/>Announce / Clipboard Data" .-> Disc_B
+    Disc_B -. "UDP Unicast Reply<br/>Presence Affirmation" .-> Disc_A
+    
+    Trans_A == "TCP Stream (53318)<br/>1MB Binary Chunks" ==> Trans_B
+    Trans_B -- "TCP ACKs<br/>SHA-256 Validations" --> Trans_A

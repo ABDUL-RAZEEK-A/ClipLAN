@@ -1,0 +1,1 @@
+{"title": "ClipLAN","icon": "build/macos/Build/Products/Release/ClipLAN.app/Contents/Resources/AppIcon.icns","background-color": "#F8FAFC","window": {"size": {"width": 540,"height": 380}},"contents": [{"x": 130,"y": 180,"type": "file","path": "build/macos/Build/Products/Release/ClipLAN.app"},{"x": 410,"y": 180,"type": "link","path": "/Applications"}]}
