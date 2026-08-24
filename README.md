@@ -666,37 +666,23 @@ However, advanced network routing, custom deployments, or debugging sessions can
 ## 15. User Interface & Screenshots
 
 <div align="center">
-  <img src="launches/playstore/screenshots/Screenshot 2026-08-22 at 8.18.33 PM.png" width="350" />
-  <br>
-  <b>Dashboard & Recent Files</b><br>
-  <i>Clean, glassmorphic UI displaying recent files, active clipboard snippets, and quick transfer actions.</i>
+  <img src="launches/playstore/screenshots/Screenshot 2026-08-22 at 8.18.33 PM.png" width="400" />
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="launches/playstore/screenshots/Screenshot 2026-08-22 at 8.19.25 PM.png" width="400" />
+  <br><br>
+  <b>Mac Interface: Dashboard & Discovery Radar</b><br>
+  <i>Clean, glassmorphic UI displaying recent files and smooth 60fps radar animation.</i>
 </div>
 
-<br><br>
+<br><br><br>
 
 <div align="center">
-  <img src="launches/playstore/screenshots/Screenshot 2026-08-22 at 8.19.25 PM.png" width="350" />
-  <br>
-  <b>Device Discovery Radar</b><br>
-  <i>Smooth, 60fps custom painter radar animation showing dynamically discovered peers via UDP multicast.</i>
-</div>
-
-<br><br>
-
-<div align="center">
-  <img src="launches/playstore/screenshots/WhatsApp Image 2026-08-21 at 16.01.49.jpeg" width="350" />
-  <br>
-  <b>Active Transfer Progress</b><br>
-  <i>Real-time progress bar with active SHA-256 verification status, exact byte counts, and speed (MB/s).</i>
-</div>
-
-<br><br>
-
-<div align="center">
-  <img src="launches/playstore/screenshots/WhatsApp Image 2026-08-21 at 16.03.40 (1).jpeg" width="350" />
-  <br>
-  <b>Settings & Configuration</b><br>
-  <i>Customization options for device broadcasting names, default save locations, and theme toggles.</i>
+  <img src="launches/playstore/screenshots/WhatsApp Image 2026-08-21 at 16.01.49.jpeg" width="250" />
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="launches/playstore/screenshots/WhatsApp Image 2026-08-21 at 16.03.40 (1).jpeg" width="250" />
+  <br><br>
+  <b>Mobile Interface: Active Transfers & Settings</b><br>
+  <i>Real-time progress bar with active SHA-256 verification status, exact byte counts, speed (MB/s), and device customization.</i>
 </div>
 
 ---
