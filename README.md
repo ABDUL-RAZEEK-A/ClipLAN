@@ -182,22 +182,22 @@ The discovery mechanism uses a lightweight, stateless heartbeat protocol. Device
 
 ```mermaid
 sequenceDiagram
-    participant Sender (Device A)
-    participant Multicast Group (224.0.0.1:53317)
-    participant Receiver (Device B)
+    participant Sender as Sender (Device A)
+    participant MulticastGroup as Multicast Group (224.0.0.1:53317)
+    participant Receiver as Receiver (Device B)
 
     Note over Sender,Receiver: Discovery Initialization
-    Sender->>Multicast Group: Join IGMP Group
-    Receiver->>Multicast Group: Join IGMP Group
+    Sender->>MulticastGroup: Join IGMP Group
+    Receiver->>MulticastGroup: Join IGMP Group
     
     loop Every 2 Seconds (Heartbeat)
-        Sender->>Multicast Group: Broadcast: {"id":"A", "name":"MacBook Pro", "ip":"192.168.1.5", "os":"macos"}
-        Multicast Group->>Receiver: Deliver Packet (UDP)
+        Sender->>MulticastGroup: Broadcast: {"id":"A", "name":"MacBook Pro", "ip":"192.168.1.5", "os":"macos"}
+        MulticastGroup->>Receiver: Deliver Packet (UDP)
         Receiver->>Receiver: Parse JSON & Update LastSeen Timestamp
         Receiver->>Receiver: Register Device A in Local State UI
         
-        Receiver->>Multicast Group: Broadcast: {"id":"B", "name":"Pixel 7", "ip":"192.168.1.12", "os":"android"}
-        Multicast Group->>Sender: Deliver Packet (UDP)
+        Receiver->>MulticastGroup: Broadcast: {"id":"B", "name":"Pixel 7", "ip":"192.168.1.12", "os":"android"}
+        MulticastGroup->>Sender: Deliver Packet (UDP)
         Sender->>Sender: Parse JSON & Update LastSeen Timestamp
         Sender->>Sender: Register Device B in Local State UI
     end
@@ -217,7 +217,7 @@ When a transfer is initiated, a direct TCP connection is established. The protoc
 sequenceDiagram
     participant Sender
     participant Receiver
-    participant FileSystem (Disk)
+    participant FileSystem as FileSystem (Disk)
 
     Sender->>Receiver: Establish TCP Connection (Port 53318)
     Receiver-->>Sender: Connection Accepted (SYN/ACK)
@@ -669,7 +669,7 @@ However, advanced network routing, custom deployments, or debugging sessions can
 
 | Dashboard & Recent Files | Device Discovery Radar | Active Transfer Progress | Settings & Configuration |
 | :---: | :---: | :---: | :---: |
-| ![Home UI Placeholder](https://via.placeholder.com/200x400.png?text=Home+Screen) | ![Discovery Placeholder](https://via.placeholder.com/200x400.png?text=Radar+Discovery) | ![Transfer Placeholder](https://via.placeholder.com/200x400.png?text=Transfer+Progress) | ![Settings Placeholder](https://via.placeholder.com/200x400.png?text=Settings+Menu) |
+| <img src="launches/playstore/screenshots/Screenshot 2026-08-22 at 8.18.33 PM.png" width="200" /> | <img src="launches/playstore/screenshots/Screenshot 2026-08-22 at 8.19.25 PM.png" width="200" /> | <img src="launches/playstore/screenshots/WhatsApp Image 2026-08-21 at 16.01.49.jpeg" width="200" /> | <img src="launches/playstore/screenshots/WhatsApp Image 2026-08-21 at 16.03.40 (1).jpeg" width="200" /> |
 | *Clean, glassmorphic UI displaying recent files, active clipboard snippets, and quick transfer actions.* | *Smooth, 60fps custom painter radar animation showing dynamically discovered peers via UDP multicast.* | *Real-time progress bar with active SHA-256 verification status, exact byte counts, and speed (MB/s).* | *Customization options for device broadcasting names, default save locations, and theme toggles.* |
 
 ---
