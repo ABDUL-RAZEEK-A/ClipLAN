@@ -665,12 +665,39 @@ However, advanced network routing, custom deployments, or debugging sessions can
 
 ## 15. User Interface & Screenshots
 
-*(Note: Replace placeholder links with actual repository image paths before publishing).*
+<div align="center">
+  <img src="launches/playstore/screenshots/Screenshot 2026-08-22 at 8.18.33 PM.png" width="350" />
+  <br>
+  <b>Dashboard & Recent Files</b><br>
+  <i>Clean, glassmorphic UI displaying recent files, active clipboard snippets, and quick transfer actions.</i>
+</div>
 
-| Dashboard & Recent Files | Device Discovery Radar | Active Transfer Progress | Settings & Configuration |
-| :---: | :---: | :---: | :---: |
-| <img src="launches/playstore/screenshots/Screenshot 2026-08-22 at 8.18.33 PM.png" width="200" /> | <img src="launches/playstore/screenshots/Screenshot 2026-08-22 at 8.19.25 PM.png" width="200" /> | <img src="launches/playstore/screenshots/WhatsApp Image 2026-08-21 at 16.01.49.jpeg" width="200" /> | <img src="launches/playstore/screenshots/WhatsApp Image 2026-08-21 at 16.03.40 (1).jpeg" width="200" /> |
-| *Clean, glassmorphic UI displaying recent files, active clipboard snippets, and quick transfer actions.* | *Smooth, 60fps custom painter radar animation showing dynamically discovered peers via UDP multicast.* | *Real-time progress bar with active SHA-256 verification status, exact byte counts, and speed (MB/s).* | *Customization options for device broadcasting names, default save locations, and theme toggles.* |
+<br><br>
+
+<div align="center">
+  <img src="launches/playstore/screenshots/Screenshot 2026-08-22 at 8.19.25 PM.png" width="350" />
+  <br>
+  <b>Device Discovery Radar</b><br>
+  <i>Smooth, 60fps custom painter radar animation showing dynamically discovered peers via UDP multicast.</i>
+</div>
+
+<br><br>
+
+<div align="center">
+  <img src="launches/playstore/screenshots/WhatsApp Image 2026-08-21 at 16.01.49.jpeg" width="350" />
+  <br>
+  <b>Active Transfer Progress</b><br>
+  <i>Real-time progress bar with active SHA-256 verification status, exact byte counts, and speed (MB/s).</i>
+</div>
+
+<br><br>
+
+<div align="center">
+  <img src="launches/playstore/screenshots/WhatsApp Image 2026-08-21 at 16.03.40 (1).jpeg" width="350" />
+  <br>
+  <b>Settings & Configuration</b><br>
+  <i>Customization options for device broadcasting names, default save locations, and theme toggles.</i>
+</div>
 
 ---
 
