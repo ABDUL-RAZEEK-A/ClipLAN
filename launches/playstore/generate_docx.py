@@ -34,7 +34,7 @@ data = [
     ('', 'Free or Paid', 'Free'),
     ('', 'App category', 'Tools / Productivity'),
     ('', 'Tags, if applicable', 'File Sharing, Local Network, Productivity'),
-    ('', 'Package name / Application ID', 'com.clipland.clipland'),
+    ('', 'Package name / Application ID', 'com.cliplan.cliplan'),
     ('', 'Contact email', 'contact@clipland.example.com'),
     
     ('2. Store Listing Details', 'Short description (maximum 80 characters)', 'Fast, serverless P2P local file sharing and shared clipboard app.'),
