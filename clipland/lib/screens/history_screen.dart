@@ -407,27 +407,7 @@ class _HistoryScreenState extends State<HistoryScreen>
             ),
           ],
 
-          // Retry button
-          if (item.status == TransferStatus.failed && isSending) ...[
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: TextButton.icon(
-                onPressed: () => state.retryTransfer(item),
-                icon: const Icon(Icons.refresh_rounded, size: 16),
-                label: const Text('Retry', style: TextStyle(fontSize: 13)),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.primaryLight,
-                  backgroundColor: AppColors.primaryLight.withValues(
-                    alpha: 0.1,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
-            ),
-          ],
+
         ],
       ),
     );

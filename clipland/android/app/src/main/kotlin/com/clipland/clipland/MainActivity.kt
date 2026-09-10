@@ -1,4 +1,4 @@
-package com.cliplan.cliplan
+package com.clipland.clipland
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine

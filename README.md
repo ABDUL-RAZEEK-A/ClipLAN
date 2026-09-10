@@ -21,6 +21,12 @@
 
 ---
 
+## 📥 Download
+
+- **macOS:** [Download ClipLAN for macOS (DMG)](clipland/ClipLAN.dmg)
+
+---
+
 ## 📖 Developer Story
 
 ### Why We Built It

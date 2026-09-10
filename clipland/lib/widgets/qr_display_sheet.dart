@@ -77,7 +77,7 @@ class QrDisplaySheet extends StatelessWidget {
             ),
             child: QrImageView(
               data: qrData,
-              version: QrVersions.auto,
+              version: 10, // Increased to 10 to fit long UUIDs + Device Names without overflowing
               size: 200.0,
               backgroundColor: Colors.white,
             ),

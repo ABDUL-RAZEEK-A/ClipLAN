@@ -13,8 +13,7 @@ import '../widgets/glassmorphic_card.dart';
 import '../widgets/qr_display_sheet.dart';
 import 'file_browser_screen.dart';
 import 'qr_scanner_screen.dart';
-import '../widgets/shared_clipboard_sheet.dart';
-import '../widgets/hashing_dialog.dart';
+
 import '../models/transfer_item.dart';
 
 /// Discover nearby devices, pick files, and initiate transfers.
@@ -30,7 +29,7 @@ class DevicesScreen extends StatefulWidget {
 class _DevicesScreenState extends State<DevicesScreen> {
   DeviceInfo? _selectedDevice;
   List<PlatformFile>? _selectedFiles;
-  bool _enableHashing = true;
+  bool _enableHashing = false;
   bool _isClearing = false;
 
   void _clearTransfers() async {
@@ -121,7 +120,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
                     id: 'manual_$ip',
                     name: 'Device at $ip',
                     ip: ip,
-                    port: 53317, // default transfer port
+                    port: 53318, // default transfer port
                     platform: 'Unknown',
                   );
                   state.addManualDevice(manualDevice);
@@ -163,23 +162,6 @@ class _DevicesScreenState extends State<DevicesScreen> {
     );
   }
 
-  /// Quick pick via system file picker (legacy support).
-  Future<void> _pickFiles() async {
-    try {
-      final result = await FilePicker.pickFiles(
-        allowMultiple: true,
-        type: FileType.any,
-      );
-      if (result != null && result.files.isNotEmpty) {
-        setState(() {
-          _selectedFiles = result.files;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error picking files: $e');
-    }
-  }
-
   // ── Send/Receive Actions ──────────────────────────────────────────────────
 
   Future<void> _sendFiles() async {
@@ -198,72 +180,6 @@ class _DevicesScreenState extends State<DevicesScreen> {
     setState(() {
       _selectedFiles = null;
     });
-  }
-
-  Future<void> _sendText() async {
-    if (_selectedDevice == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Select a device first'),
-          backgroundColor: AppColors.surface,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
-      return;
-    }
-
-    final ctrl = TextEditingController();
-    final text = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'Send Text',
-          style: TextStyle(color: AppColors.textPrimary),
-        ),
-        content: TextField(
-          controller: ctrl,
-          maxLines: 5,
-          style: const TextStyle(color: AppColors.textPrimary),
-          decoration: const InputDecoration(hintText: 'Type your message...'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(
-              'Cancel',
-              style: TextStyle(color: AppColors.textTertiary),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, ctrl.text),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryLight,
-              foregroundColor: AppColors.background,
-            ),
-            child: const Text('Send'),
-          ),
-        ],
-      ),
-    );
-
-    if (text != null && text.trim().isNotEmpty && mounted) {
-      final state = context.read<AppState>();
-      await state.sendText(_selectedDevice!, text);
-    }
-  }
-
-  void _shareClipboard() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const SharedClipboardSheet(),
-    );
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────
@@ -332,6 +248,16 @@ class _DevicesScreenState extends State<DevicesScreen> {
     }
   }
 
+  PopupMenuItem<double> _buildSpeedItem(double value, String label) {
+    return PopupMenuItem<double>(
+      value: value,
+      child: Text(
+        label,
+        style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+      ),
+    );
+  }
+
   String _formatSize(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
@@ -349,23 +275,24 @@ class _DevicesScreenState extends State<DevicesScreen> {
 
     if (state.pendingSharedFiles.isNotEmpty) {
       final newFiles = List<String>.from(state.pendingSharedFiles);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted) return;
         bool changed = false;
         _selectedFiles ??= [];
         for (final path in newFiles) {
           final file = File(path);
-          if (file.existsSync() && !_selectedFiles!.any((f) => f.path == path)) {
+          if (await file.exists() && !_selectedFiles!.any((f) => f.path == path)) {
+            final len = await file.length();
             _selectedFiles!.add(PlatformFile(
               path: path,
               name: file.uri.pathSegments.last,
-              size: file.lengthSync(),
+              size: len,
             ));
             changed = true;
           }
         }
-        if (changed) setState(() {});
-        context.read<AppState>().consumeSharedFiles();
+        if (changed && mounted) setState(() {});
+        if (context.mounted) context.read<AppState>().consumeSharedFiles();
       });
     }
 
@@ -410,6 +337,65 @@ class _DevicesScreenState extends State<DevicesScreen> {
                     ),
                   ),
                   actions: [
+                    // Speed Limit Dropdown
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8, top: 8),
+                      child: PopupMenuButton<double>(
+                        tooltip: 'Set Transfer Speed Limit',
+                        initialValue: state.transferSpeedLimit,
+                        onSelected: (val) => state.setTransferSpeedLimit(val),
+                        offset: const Offset(0, 40),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        color: AppColors.surfaceLight,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceLight,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: AppColors.divider),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.speed_rounded, size: 16, color: AppColors.primaryLight),
+                              const SizedBox(width: 4),
+                              Text(
+                                state.transferSpeedLimit == 0
+                                    ? 'Unlimited'
+                                    : '${state.transferSpeedLimit.toInt()} MB/s',
+                                style: const TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const Icon(Icons.arrow_drop_down, size: 16, color: AppColors.textTertiary),
+                            ],
+                          ),
+                        ),
+                        itemBuilder: (context) => [
+                          const PopupMenuItem<double>(
+                            enabled: false,
+                            child: Text(
+                              'Auto-adjusts to your system\'s safe\ncapacity to prevent crashes.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textTertiary,
+                                height: 1.2,
+                              ),
+                            ),
+                          ),
+                          const PopupMenuDivider(),
+                          _buildSpeedItem(0, 'Unlimited (Unstable)'),
+                          _buildSpeedItem(20, '20 MB/s'),
+                          _buildSpeedItem(10, '10 MB/s'),
+                          _buildSpeedItem(5, '5 MB/s (Default)'),
+                          _buildSpeedItem(2, '2 MB/s'),
+                        ],
+                      ),
+                    ),
                     // Online status badge
                     Container(
                       margin: const EdgeInsets.only(right: 16, top: 8),
@@ -419,14 +405,14 @@ class _DevicesScreenState extends State<DevicesScreen> {
                       ),
                       decoration: BoxDecoration(
                         color:
-                            (state.isDiscovering
+                            (state.isOnline
                                     ? AppColors.success
                                     : AppColors.error)
                                 .withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
                           color:
-                              (state.isDiscovering
+                              (state.isOnline
                                       ? AppColors.success
                                       : AppColors.error)
                                   .withValues(alpha: 0.2),
@@ -440,13 +426,13 @@ class _DevicesScreenState extends State<DevicesScreen> {
                             height: 8,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: state.isDiscovering
+                              color: state.isOnline
                                   ? AppColors.success
                                   : AppColors.error,
                               boxShadow: [
                                 BoxShadow(
                                   color:
-                                      (state.isDiscovering
+                                      (state.isOnline
                                               ? AppColors.success
                                               : AppColors.error)
                                           .withValues(alpha: 0.4),
@@ -457,9 +443,9 @@ class _DevicesScreenState extends State<DevicesScreen> {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            state.isDiscovering ? 'Online' : 'Offline',
+                            state.isOnline ? 'Online' : 'Offline',
                             style: TextStyle(
-                              color: state.isDiscovering
+                              color: state.isOnline
                                   ? AppColors.success
                                   : AppColors.error,
                               fontSize: 12,
@@ -727,12 +713,25 @@ class _DevicesScreenState extends State<DevicesScreen> {
                 // ── Device List / Empty State ────────────────────────────────
                 if (state.devices.isEmpty)
                   SliverToBoxAdapter(
-                    child: SizedBox(
-                      height: 280,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 32),
                       child: Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                              child: Text(
+                                'Please connect devices on the same Network...',
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(
+                                      color: AppColors.textPrimary,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
                             const SizedBox(
                               width: 200,
                               height: 200,
@@ -743,17 +742,6 @@ class _DevicesScreenState extends State<DevicesScreen> {
                               'Scanning for devices...',
                               style: Theme.of(context).textTheme.bodyLarge
                                   ?.copyWith(color: AppColors.textTertiary),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Make sure devices are on the same network',
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(
-                                    color: AppColors.textTertiary.withValues(
-                                      alpha: 0.7,
-                                    ),
-                                    fontSize: 12,
-                                  ),
                             ),
                           ],
                         ),
@@ -939,7 +927,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
                                   value: _enableHashing,
                                   onChanged: (val) {
                                     setState(() {
-                                      _enableHashing = val ?? true;
+                                      _enableHashing = val ?? false;
                                     });
                                   },
                                   activeColor: AppColors.primaryLight,
@@ -974,7 +962,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
                       onTap: () async {
                         final String? result =
                             await FilePicker.getDirectoryPath();
-                        if (result != null && mounted) {
+                        if (result != null && context.mounted) {
                           context.read<AppState>().updateSavePath(result);
                         }
                       },

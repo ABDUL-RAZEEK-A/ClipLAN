@@ -1,7 +1,12 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'dart:isolate';
+import 'dart:ui';
+import '../services/notification_service.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
@@ -17,7 +22,7 @@ import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
 
 /// Central application state — manages discovery, transfers, history, clipboard, and settings.
-class AppState extends ChangeNotifier {
+class AppState extends ChangeNotifier with WidgetsBindingObserver {
   final StorageService storage;
   final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
       GlobalKey<ScaffoldMessengerState>();
@@ -30,14 +35,17 @@ class AppState extends ChangeNotifier {
   List<ClipboardItem> _myClipboard = [];
   final List<Map<String, dynamic>> _sharedClipboards = [];
   bool _isDiscovering = false;
-  bool _isServerRunning = false;
-  bool _isDisposed = false;
+  bool _isInForeground = true; // Track app lifecycle for notification optimization
 
   // Rate limiter (0.0 = unlimited, > 0 = Mbps)
-  double _transferSpeedLimitMbps = 0.0;
+  double _transferSpeedLimitMbps = 5.0; // Default to 5 MB/s for stability
 
   /// Timers that must be cancelled on dispose to prevent setState-after-dispose crashes.
   final List<Timer> _pendingTimers = [];
+
+  /// Throttle UI rebuilds during high-frequency transfer progress updates.
+  Timer? _progressThrottleTimer;
+  bool _progressDirty = false;
 
   /// Set by the HomeScreen to display approval bottom-sheets.
   Future<bool> Function(TransferItem)? showApprovalDialog;
@@ -56,6 +64,7 @@ class AppState extends ChangeNotifier {
   bool get isDiscovering => _isDiscovering;
   bool get isServerRunning => _transfer != null;
   String? get localIp => _discovery?.localIp;
+  bool get isOnline => localIp != null && localIp!.isNotEmpty && localIp != '127.0.0.1' && localIp != '0.0.0.0';
   int get serverPort => _transfer?.port ?? 53318;
   String get deviceId => storage.deviceId;
   String get deviceName => storage.deviceName;
@@ -86,7 +95,31 @@ class AppState extends ChangeNotifier {
   // ---- Lifecycle ----------------------------------------------------------
 
   AppState(this.storage) {
-    _init();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _init();
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    _isInForeground = (state == AppLifecycleState.resumed);
+    
+    if (state == AppLifecycleState.resumed) {
+      // Clear any lingering progress notification when re-entering app
+      NotificationService().cancelNotification(888);
+      // startServer is now guarded against redundant restarts internally
+      _discovery?.start();
+      _transfer?.startServer(savePath: storage.savePath);
+    } else if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+      _discovery?.stop();
+      // Only stop server if no active transfers to prevent data loss
+      if (_activeTransfers.isEmpty) {
+        _transfer?.stopServer();
+      }
+    }
   }
 
   Future<void> refreshDevices() async {
@@ -140,8 +173,12 @@ class AppState extends ChangeNotifier {
 
       // Ensure save path
       if (storage.savePath.isEmpty) {
-        final dir = await getApplicationDocumentsDirectory();
-        storage.savePath = '${dir.path}/ClipLAN';
+        if (Platform.isAndroid) {
+          storage.savePath = '/storage/emulated/0/Download/ClipLAN';
+        } else {
+          final dir = await getApplicationDocumentsDirectory();
+          storage.savePath = '${dir.path}/ClipLAN';
+        }
       }
       debugPrint('[ClipLAN] Save path: ${storage.savePath}');
 
@@ -178,31 +215,55 @@ class AppState extends ChangeNotifier {
         }
       }
 
-      // Initialize Share Intent
-      ReceiveSharingIntent.instance.getMediaStream().listen(
-        (List<SharedMediaFile> value) {
+      // Initialize Share Intent (Mobile Only)
+      if (Platform.isAndroid || Platform.isIOS) {
+        ReceiveSharingIntent.instance.getMediaStream().listen(
+          (List<SharedMediaFile> value) {
+            for (var file in value) {
+              _handleSharedFile(file.path);
+            }
+          },
+          onError: (err) {
+            debugPrint("getIntentDataStream error: $err");
+          },
+        );
+        ReceiveSharingIntent.instance.getInitialMedia().then((
+          List<SharedMediaFile> value,
+        ) {
           for (var file in value) {
             _handleSharedFile(file.path);
           }
-        },
-        onError: (err) {
-          debugPrint("getIntentDataStream error: $err");
-        },
-      );
-      ReceiveSharingIntent.instance.getInitialMedia().then((
-        List<SharedMediaFile> value,
-      ) {
-        for (var file in value) {
-          _handleSharedFile(file.path);
-        }
-        ReceiveSharingIntent.instance.reset();
-      });
+          ReceiveSharingIntent.instance.reset();
+        });
+      }
 
       // Request permissions on Android
       if (Platform.isAndroid) {
-        debugPrint('[ClipLAN] Requesting network permissions...');
         await Permission.nearbyWifiDevices.request();
+        await Permission.storage.request();
+        await Permission.manageExternalStorage.request();
+        // Request notification permission for Android 13+
+        await Permission.notification.request();
       }
+
+      await NotificationService().init();
+
+      // Listen for cancel events from the notification center
+      final ReceivePort cancelPort = ReceivePort();
+      IsolateNameServer.removePortNameMapping(kCancelPortName);
+      IsolateNameServer.registerPortWithName(cancelPort.sendPort, kCancelPortName);
+      cancelPort.listen((message) {
+        if (message is String) {
+          debugPrint('[AppState] Received cancel action from notification for transfer: $message');
+          try {
+            final t = _activeTransfers.firstWhere((t) => t.id == message);
+            _transfer?.cancelTransfer(t);
+          } catch (e) {
+            debugPrint('[AppState] Could not find transfer to cancel: $e');
+          }
+        }
+      });
+
 
       // Start transfer server
       final transfer = TransferService()
@@ -216,7 +277,6 @@ class AppState extends ChangeNotifier {
 
       try {
         await transfer.startServer(savePath: storage.savePath);
-        _isServerRunning = true;
         debugPrint(
           '[ClipLAN] Transfer server started on port ${transfer.port}',
         );
@@ -230,7 +290,6 @@ class AppState extends ChangeNotifier {
         username: storage.username,
         os: storage.os,
         hardwareName: storage.hardwareName,
-        avatarBase64: storage.avatarBase64,
         deviceId: storage.deviceId,
         serverPort: transfer.port,
       );
@@ -327,6 +386,30 @@ class AppState extends ChangeNotifier {
         );
       }
     }
+    
+    // If we reach here, UI is likely backgrounded or detached. Show a notification.
+    if (Platform.isAndroid || Platform.isIOS) {
+      try {
+        final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+            FlutterLocalNotificationsPlugin();
+        await flutterLocalNotificationsPlugin.show(
+          transfer.id.hashCode,
+          'Incoming File',
+          '${transfer.deviceName} wants to send you ${transfer.files.length} files.',
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'cliplan_foreground',
+              'ClipLAN Service',
+              importance: Importance.high,
+              priority: Priority.high,
+            ),
+          ),
+        );
+      } catch (e) {
+        debugPrint('[AppState] Failed to show notification: $e');
+      }
+    }
+    
     return !storage.requireApproval; // auto-accept if approval disabled
   }
 
@@ -340,15 +423,91 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _manageBackgroundService() async {
+    if (!Platform.isAndroid) return;
+    
+    final hasActive = _activeTransfers.any((t) => !_isTerminal(t.status));
+    final service = FlutterBackgroundService();
+    if (hasActive) {
+      if (!(await service.isRunning())) {
+        await service.startService();
+      }
+    } else {
+      if (await service.isRunning()) {
+        service.invoke('stopService');
+      }
+    }
+  }
+
   void _handleTransferUpdate(TransferItem transfer) {
     _addOrUpdateTransfer(transfer);
 
     if (_isTerminal(transfer.status)) {
       storage.addToHistory(transfer);
       _history = storage.getHistory();
+      
+      // Clear progress notification and show completion
+      NotificationService().cancelNotification(888);
+      
+      if (!_isInForeground) {
+        if (transfer.status == TransferStatus.completed) {
+          NotificationService().showCompletionNotification(
+            id: transfer.id.hashCode,
+            title: 'Transfer Complete',
+            body: '${transfer.deviceName} - ${transfer.files.length} file(s) transferred successfully.',
+          );
+        } else if (transfer.status == TransferStatus.failed) {
+          NotificationService().showCompletionNotification(
+            id: transfer.id.hashCode,
+            title: 'Transfer Failed',
+            body: 'Transfer with ${transfer.deviceName} failed.',
+          );
+        }
+      }
+      
+      // Terminal state changes must update UI immediately
+      notifyListeners();
+      return;
     }
 
-    notifyListeners();
+    // Throttle progress-only updates to max 2 rebuilds/sec to prevent UI jank
+    if (transfer.status == TransferStatus.transferring) {
+      _progressDirty = true;
+      _progressThrottleTimer ??= Timer.periodic(
+        const Duration(milliseconds: 500),
+        (_) {
+          if (_progressDirty) {
+            _progressDirty = false;
+            notifyListeners();
+            
+            // Update notification
+            int progressPercent = 0;
+            if (transfer.totalSize > 0) {
+              progressPercent = ((transfer.bytesTransferred / transfer.totalSize) * 100).toInt();
+            }
+            
+            if (!_isInForeground) {
+              NotificationService().showProgressNotification(
+                id: 888, // Foreground service notification ID
+                title: transfer.direction == TransferDirection.receiving 
+                    ? 'Receiving from ${transfer.deviceName}' 
+                    : 'Sending to ${transfer.deviceName}',
+                body: 'Transferring ${transfer.files.length} file(s)...',
+                progress: progressPercent,
+                maxProgress: 100,
+                payload: transfer.id,
+              );
+            }
+          } else {
+            _progressThrottleTimer?.cancel();
+            _progressThrottleTimer = null;
+          }
+        },
+      );
+    } else {
+      // Status changes (waitingApproval, etc.) update immediately
+      notifyListeners();
+    }
   }
 
   void _addOrUpdateTransfer(TransferItem t) {
@@ -358,15 +517,18 @@ class AppState extends ChangeNotifier {
     } else {
       _activeTransfers.add(t);
     }
+    _manageBackgroundService();
   }
 
   void dismissTransfer(String transferId) {
     _activeTransfers.removeWhere((t) => t.id == transferId);
+    _manageBackgroundService();
     notifyListeners();
   }
 
   void clearTerminalTransfers() {
     _activeTransfers.removeWhere((t) => _isTerminal(t.status));
+    _manageBackgroundService();
     notifyListeners();
   }
 
@@ -380,7 +542,7 @@ class AppState extends ChangeNotifier {
   Future<void> sendFiles(
     DeviceInfo device,
     List<PlatformFile> files, {
-    bool enableHashing = true,
+    bool enableHashing = false,
   }) async {
     final fileItems = files
         .map(
@@ -401,6 +563,7 @@ class AppState extends ChangeNotifier {
       files: fileItems,
       onUpdate: _handleTransferUpdate,
       enableHashing: enableHashing,
+      speedLimitMBps: _transferSpeedLimitMbps.toInt(),
     );
   }
 
@@ -447,6 +610,7 @@ class AppState extends ChangeNotifier {
       device: device,
       files: fileItems,
       onUpdate: _handleTransferUpdate,
+      speedLimitMBps: _transferSpeedLimitMbps.toInt(),
     );
   }
 
@@ -467,7 +631,6 @@ class AppState extends ChangeNotifier {
 
   void updateAvatarBase64(String b64) {
     storage.avatarBase64 = b64;
-    _discovery?.updateAvatarBase64(b64);
     notifyListeners();
   }
 
@@ -607,8 +770,10 @@ class AppState extends ChangeNotifier {
 
   @override
   void dispose() {
-    _isDisposed = true;
+    WidgetsBinding.instance.removeObserver(this);
     // Cancel all pending timers so they don't call notifyListeners after disposal.
+    _progressThrottleTimer?.cancel();
+    _progressThrottleTimer = null;
     for (final t in _pendingTimers) {
       t.cancel();
     }

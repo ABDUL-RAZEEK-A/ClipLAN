@@ -25,9 +25,8 @@ class DiscoveryService {
 
   String _deviceName;
   String _username;
-  String _os;
-  String _hardwareName;
-  String _avatarBase64;
+  final String _os;
+  final String _hardwareName;
   final String _deviceId;
   final int _serverPort;
   String? _localIp;
@@ -44,14 +43,12 @@ class DiscoveryService {
     required String username,
     required String os,
     required String hardwareName,
-    required String avatarBase64,
     required String deviceId,
     required int serverPort,
   }) : _deviceName = deviceName,
        _username = username,
        _os = os,
        _hardwareName = hardwareName,
-       _avatarBase64 = avatarBase64,
        _deviceId = deviceId,
        _serverPort = serverPort;
 
@@ -65,7 +62,6 @@ class DiscoveryService {
     _broadcast();
   }
 
-  void updateAvatarBase64(String avatar) => _avatarBase64 = avatar;
 
   Future<void> start() async {
     await _findLocalIps();
@@ -90,6 +86,14 @@ class DiscoveryService {
         _handleDatagram,
         onError: (dynamic error) {
           debugPrint('[DiscoveryService] UDP Socket error: $error');
+          if (error is SocketException) {
+            final code = error.osError?.errorCode;
+            if (code == 65 || code == 51 || code == 50 || code == 64) {
+              // Ignore transient routing errors (e.g. No route to host)
+              // The socket itself is still healthy for receiving!
+              return;
+            }
+          }
           _rebindSocket();
         },
         onDone: () {
@@ -97,10 +101,10 @@ class DiscoveryService {
         },
       );
 
-      // Broadcast presence every 1 second
+      // Broadcast presence every 3 seconds (throttled)
       _broadcastTimer?.cancel();
       _broadcastTimer = Timer.periodic(
-        const Duration(seconds: 1),
+        const Duration(seconds: 3),
         (_) => _broadcast(),
       );
 
@@ -138,81 +142,112 @@ class DiscoveryService {
       );
 
       final ips = <String>{};
+      String? wifiIp;
       for (final iface in interfaces) {
+        final name = iface.name.toLowerCase();
+        
+        // Ignore cellular data, VPNs, and virtual interfaces
+        if (name.startsWith('rmnet') || // Android Cellular
+            name.startsWith('ccmni') || // Mediatek Cellular
+            name.startsWith('pdp_ip') || // iOS Cellular
+            name.startsWith('tun') || // VPN
+            name.startsWith('tap') || // VPN
+            name.startsWith('utun') || // Apple VPN
+            name.startsWith('tailscale') || // Tailscale VPN
+            name.startsWith('wg')) { // Wireguard VPN
+          continue;
+        }
+
         for (final addr in iface.addresses) {
           if (!addr.isLoopback && addr.type == InternetAddressType.IPv4) {
             ips.add(addr.address);
+            if (name.startsWith('wlan') || name.startsWith('en')) {
+              wifiIp ??= addr.address;
+            }
           }
         }
       }
 
       _localIps = ips;
       if (ips.isNotEmpty) {
-        _localIp = ips.first;
+        _localIp = wifiIp ?? ips.first;
       }
     } catch (_) {}
   }
 
+  bool _isBroadcasting = false;
+
   Future<void> _broadcast({String? targetIp}) async {
-    if (_socket == null) return;
-
-    // Periodically refresh IP set if empty
-    if (_localIps.isEmpty) {
-      await _findLocalIps();
-      if (_localIp == null) return;
-    }
-
-    final message = jsonEncode({
-      'type': 'announce',
-      'id': _deviceId,
-      'name': _deviceName,
-      'username': _username,
-      'os': _os,
-      'hardwareName': _hardwareName,
-      'ip': _localIp ?? '',
-      'port': _serverPort,
-      'platform': Platform.isAndroid
-          ? 'android'
-          : (Platform.isIOS ? 'ios' : 'unknown'),
-    });
-
-    final data = utf8.encode(message);
+    if (_socket == null || _isBroadcasting) return;
+    _isBroadcasting = true;
 
     try {
-      // If a specific target IP is provided (unicast response), send directly to target
-      if (targetIp != null && targetIp.isNotEmpty) {
-        try {
-          _socket!.send(data, InternetAddress(targetIp), discoveryPort);
-        } catch (_) {}
-        return;
+      // Periodically refresh IP set if empty
+      if (_localIps.isEmpty) {
+        await _findLocalIps();
+        if (_localIp == null) return;
       }
 
-      // 1. Global Broadcast
-      _socket!.send(data, InternetAddress('255.255.255.255'), discoveryPort);
+      final message = jsonEncode({
+        'type': 'announce',
+        'id': _deviceId,
+        'name': _deviceName,
+        'username': _username,
+        'os': _os,
+        'hardwareName': _hardwareName,
+        'ip': _localIp ?? '',
+        'port': _serverPort,
+        'platform': Platform.isAndroid
+            ? 'android'
+            : (Platform.isIOS
+                ? 'ios'
+                : (Platform.isMacOS
+                    ? 'macos'
+                    : (Platform.isWindows
+                        ? 'windows'
+                        : (Platform.isLinux ? 'linux' : 'unknown')))),
+      });
 
-      // 2. Multicast Groups
-      _socket!.send(data, InternetAddress('224.0.0.1'), discoveryPort);
-      _socket!.send(data, InternetAddress('224.0.0.251'), discoveryPort);
+      final data = utf8.encode(message);
 
-      // 3. Subnet Broadcasts for all active interface IPs
-      for (final ip in _localIps) {
-        final parts = ip.split('.');
-        if (parts.length == 4) {
-          final subnetBroadcast = '${parts[0]}.${parts[1]}.${parts[2]}.255';
-          _socket!.send(data, InternetAddress(subnetBroadcast), discoveryPort);
-        }
-      }
-
-      // 4. Direct unicast heartbeats to all previously discovered active peers
-      for (final device in _devices.values) {
-        if (device.ip.isNotEmpty && !_localIps.contains(device.ip)) {
+      try {
+        // If a specific target IP is provided (unicast response), send directly to target
+        if (targetIp != null && targetIp.isNotEmpty) {
           try {
-            _socket!.send(data, InternetAddress(device.ip), discoveryPort);
+            _socket!.send(data, InternetAddress(targetIp), discoveryPort);
           } catch (_) {}
+          return;
         }
+
+        // 1. Global Broadcast
+        _socket!.send(data, InternetAddress('255.255.255.255'), discoveryPort);
+
+        // 2. Multicast Groups
+        _socket!.send(data, InternetAddress('224.0.0.1'), discoveryPort);
+        _socket!.send(data, InternetAddress('224.0.0.251'), discoveryPort);
+
+        // 3. Subnet Broadcasts for all active interface IPs
+        for (final ip in _localIps) {
+          final parts = ip.split('.');
+          if (parts.length == 4) {
+            final subnetBroadcast = '${parts[0]}.${parts[1]}.${parts[2]}.255';
+            _socket!.send(data, InternetAddress(subnetBroadcast), discoveryPort);
+          }
+        }
+
+        // 4. Direct unicast heartbeats to all previously discovered active peers
+        for (final device in _devices.values) {
+          if (device.ip.isNotEmpty && !_localIps.contains(device.ip)) {
+            try {
+              _socket!.send(data, InternetAddress(device.ip), discoveryPort);
+            } catch (_) {}
+          }
+        }
+      } catch (e) {
+        debugPrint('[DiscoveryService] Broadcast error: $e');
       }
-    } catch (e) {
-      debugPrint('[DiscoveryService] Broadcast error: $e');
+    } finally {
+      _isBroadcasting = false;
     }
   }
 
@@ -288,9 +323,17 @@ class DiscoveryService {
         }
 
         final isNewDevice = !_devices.containsKey(device.id);
+        final existingDevice = _devices[device.id];
+        
+        bool needsUiUpdate = isNewDevice || 
+            (existingDevice != null && (existingDevice.name != device.name || existingDevice.ip != device.ip));
+            
         device.lastSeen = DateTime.now();
         _devices[device.id] = device;
-        _devicesController.add(devices);
+        
+        if (needsUiUpdate) {
+          _devicesController.add(devices);
+        }
 
         // Instant Handshake: If we just discovered a new peer or updated it,
         // send an immediate unicast presence announcement directly back to the sender's IP.

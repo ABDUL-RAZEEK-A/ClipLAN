@@ -6,6 +6,8 @@
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>ClipLAN uses your local network to discover and share files with nearby devices.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>ClipLAN uses your camera to scan QR codes from other devices.</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIconFile</key>

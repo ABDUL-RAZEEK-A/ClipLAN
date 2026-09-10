@@ -80,13 +80,7 @@ class _RadarPainter extends CustomPainter {
     canvas.drawCircle(
       center,
       maxR * 1.05,
-      Paint()
-        ..shader = RadialGradient(
-          colors: [
-            AppColors.primaryLight.withValues(alpha: 0.05),
-            AppColors.primaryLight.withValues(alpha: 0.0),
-          ],
-        ).createShader(Rect.fromCircle(center: center, radius: maxR * 1.05)),
+      Paint()..color = AppColors.primaryLight.withValues(alpha: 0.05),
     );
 
     // Concentric grid circles in warm brown
@@ -116,17 +110,17 @@ class _RadarPainter extends CustomPainter {
       linePaint,
     );
 
-    // Sweep gradient (radar arm) — warm peach tones
+    // Sweep gradient (radar arm) — simplified to an arc to save CPU
     final sweepPaint = Paint()
-      ..shader = SweepGradient(
-        startAngle: rotation,
-        endAngle: rotation + pi / 2,
-        colors: [
-          AppColors.primaryLight.withValues(alpha: 0.35),
-          AppColors.primaryLight.withValues(alpha: 0.0),
-        ],
-      ).createShader(Rect.fromCircle(center: center, radius: maxR));
-    canvas.drawCircle(center, maxR, sweepPaint);
+      ..color = AppColors.primaryLight.withValues(alpha: 0.15)
+      ..style = PaintingStyle.fill;
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: maxR),
+      rotation,
+      pi / 2,
+      true,
+      sweepPaint,
+    );
 
     // Expanding pulse rings in warm tones
     for (var i = 0; i < 3; i++) {
@@ -157,44 +151,26 @@ class _RadarPainter extends CustomPainter {
         Paint()..color = AppColors.primaryLight.withValues(alpha: opacity),
       );
 
-      // Particle glow
+      // Particle glow (simplified to flat color)
       canvas.drawCircle(
         Offset(px, py),
         radius * 3,
-        Paint()
-          ..shader =
-              RadialGradient(
-                colors: [
-                  AppColors.primaryLight.withValues(alpha: opacity * 0.3),
-                  AppColors.primaryLight.withValues(alpha: 0.0),
-                ],
-              ).createShader(
-                Rect.fromCircle(center: Offset(px, py), radius: radius * 3),
-              ),
+        Paint()..color = AppColors.primaryLight.withValues(alpha: opacity * 0.15),
       );
     }
 
-    // Center dot — warm gradient
+    // Center dot
     canvas.drawCircle(
       center,
       6,
-      Paint()
-        ..shader = const RadialGradient(
-          colors: [AppColors.primaryLight, AppColors.primary],
-        ).createShader(Rect.fromCircle(center: center, radius: 6)),
+      Paint()..color = AppColors.primary,
     );
 
     // Center glow
     canvas.drawCircle(
       center,
       22,
-      Paint()
-        ..shader = RadialGradient(
-          colors: [
-            AppColors.primaryLight.withValues(alpha: 0.35),
-            AppColors.primaryLight.withValues(alpha: 0.0),
-          ],
-        ).createShader(Rect.fromCircle(center: center, radius: 22)),
+      Paint()..color = AppColors.primaryLight.withValues(alpha: 0.15),
     );
   }
 

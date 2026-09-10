@@ -17,6 +17,7 @@ On mobile platforms (Android and iOS), the app focuses heavily on the seamless u
 2. **Cross-Platform Clipboard Synchronization:** Instantaneous text sharing between devices. A copied text snippet on an Android phone can immediately populate the clipboard of an iOS or macOS device on the network.
 3. **QR Code Connection:** If UDP broadcasting fails due to complex network topologies (like enterprise networks blocking subnet broadcasts), devices can manually pair using QR codes containing the IP and port metadata.
 4. **Offline First:** Zero internet reliance ensures absolute data privacy. 
+5. **Dynamic Speed Throttling:** Built-in speed constraints (2MB/s to 20MB/s) map proportionally to adaptive I/O chunk sizes (1MB to 10MB). "Unlimited" mode blasts up to 25MB chunk arrays for max gigabit throughput. Senders and receivers match their disk I/O synchronously, ensuring flawless transfers without crashing older devices.
 
 ================================================================================
 2. TECHNOLOGY STACK
@@ -47,6 +48,41 @@ The system operates on a decentralized mesh topology. Every instance of ClipLAN 
 2.  **UDP Announcer**: Concurrently, it spins up a UDP broadcast socket. It shouts an "I am here" JSON payload to the `255.255.255.255` broadcast address at regular intervals.
 3.  **The Handshake**: When Device B hears Device A's UDP broadcast, it reads Device A's IP and TCP port. If Device B wants to send a file to Device A, it opens a direct TCP connection to Device A's IP:Port. 
 4.  **Payload Exchange**: The TCP stream is opened. The sender writes a JSON header (containing filename, size, type, and SHA-256 hash). A delimiter is sent, followed by the raw binary bytes of the file in chunks. The receiver parses the header, allocates file space, and writes the incoming bytes to the disk directly using `IOSink` to prevent RAM overflow.
+
+================================================================================
+3.1 LIFECYCLE OF A 10MB FILE TRANSFER (EXAMPLE)
+================================================================================
+
+To understand the exact resource usage and data transformation during a transfer, let us trace a 10MB file (e.g., `video.mp4` - 10,485,760 bytes) sent from Device A (Sender) to Device B (Receiver).
+
+STAGE 1: PREPARATION (SENDER)
+*   **File Selection**: User selects the 10MB file using `file_picker`.
+*   **Header Creation**: 
+    *   The app retrieves the file metadata (name and size). Note that the SHA-256 hash is *not* computed beforehand to save disk read time.
+    *   A JSON header is created: `{"type": "file", "name": "video.mp4", "size": 10485760}`.
+    *   The header (around ~150 Bytes) is converted to a UTF-8 string and appended with a standard `\n\n\n` delimiter.
+*   **RAM Usage**: Negligible (< 1MB). Only the JSON header and file metadata reside in memory.
+
+STAGE 2: STREAMING & HASHING ON THE FLY (SENDER -> RECEIVER)
+*   **Dynamic Chunk Sizing**: The 10MB file is NEVER loaded entirely into RAM. Based on the user's selected Speed Limit (e.g., 5 MB/s, 10 MB/s, or Unlimited), the app mathematically calculates a proportional disk read chunk size (ranging from 1MB up to 25MB for unlimited). The sender loads exactly this chunk into RAM.
+*   **Inline Hashing & Throttling**: As each chunk is read, it is simultaneously passed into a SHA-256 chunked conversion sink and forwarded to the TCP Socket. If a speed limit is applied, a precise stopwatch paces the stream, inserting micro-delays between yields to strictly enforce the MB/s cap.
+*   **Transmission**: 
+    *   The socket flushes these dynamic chunks continuously over the LAN router (or Hotspot). 
+    *   *Data Usage*: Since this happens over a Local Area Network, zero cellular/internet data is consumed. The only data moved is over the internal router's bandwidth.
+*   **RAM Usage (Sender)**: Constrained strictly to the dynamically calculated chunk size (1MB - 25MB), preventing Garbage Collection lag (jank) on low-end devices.
+
+STAGE 3: RECEIVING, WRITING & HASHING (RECEIVER)
+*   **Header Parsing**: The receiver's `ServerSocket` accepts the connection, reads bytes until the `\n\n\n` delimiter, and parses the 150-Byte JSON header.
+*   **File Allocation**: It creates an empty file named `video.mp4` in the device's Downloads folder.
+*   **Synchronized Disk Flushing & Hashing**: 
+    *   The receiver reads the `speedLimitMBps` metadata payload from the sender. It buffers incoming bytes in RAM until it precisely matches the sender's dynamic chunk size (e.g., 5MB or 25MB).
+    *   Once the buffer fills, the app flushes the entire chunk to the `IOSink` in a single massive I/O operation to the phone's persistent storage (NAND Flash/SSD), drastically minimizing disk write bottlenecks.
+    *   Concurrently, the receiver passes these incoming chunks into its own SHA-256 chunked conversion sink.
+*   **RAM Usage (Receiver)**: Just like the sender, the receiver relies on buffered streaming. Peak RAM usage during the transfer remains incredibly low (~a few MBs for the stream buffers and UI rendering).
+
+STAGE 4: COMPLETION & VERIFICATION
+*   **End of Stream & Hash Exchange**: Once exactly 10,485,760 bytes (10MB) are streamed, the sender completes its SHA-256 hash calculation and immediately sends a completion message: `{"type": "file_hash", "hash": "abc123..."}`.
+*   **Integrity Check**: The receiver finishes its own inline SHA-256 calculation, closes the `IOSink`, and awaits the sender's completion message. It compares the sender's final hash with its own computed hash. If they match, the transfer is marked "Completed" in the state and written to Hive storage.
 
 ================================================================================
 4. THE 5 CORE MODULES

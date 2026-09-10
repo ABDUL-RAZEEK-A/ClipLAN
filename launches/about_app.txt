@@ -91,22 +91,18 @@ ClipLAN implements a Zero-Copy stream architecture using `streamBytesTo`. The en
 5.3 DYNAMIC OOM BACKPRESSURE & FLUSHING
 A severe hardware limitation occurs when the Wi-Fi speed dramatically outpaces the Disk Write speed. If an iPad is receiving data over Wi-Fi 6 at 80 MB/s, but its internal storage can only physically write at 20 MB/s, the operating system is forced to buffer the remaining 60 MB/s in the device's RAM. Over a 5-minute transfer, this buffer explodes to several gigabytes, inevitably causing the OS to forcibly crash the app.
 
-ClipLAN dynamically prevents this using a backpressure tracking algorithm. It continuously monitors the exact number of bytes piped to the disk. The exact millisecond this buffer crosses a 10 Megabyte threshold, ClipLAN commands the disk sink to `await sink.flush()`. This command synchronously blocks the network socket from reading any more data off the Wi-Fi chip until the physical disk successfully flushes the buffer to the permanent storage platters. Once flushed, the network socket is instantly un-paused (`_subscription?.resume()`). This creates a perfectly stable, undulating pipeline where RAM usage remains flat indefinitely, theoretically allowing ClipLAN to transfer a 1-Terabyte file on a device with only 2 Gigabytes of RAM.
+ClipLAN prevents this by delegating backpressure to the lowest levels possible. On the sending side, it relies completely on the Dart socket stream (`socket.addStream`), allowing the underlying operating system kernel to automatically govern network transmission without manually halting the CPU. On the receiving side, it tracks the un-flushed bytes written to the disk sink. When the un-flushed disk buffer crosses a 16 Megabyte threshold, it calls `await sink.flush()`. This synchronous lock temporarily blocks the socket stream until the physical platters catch up, maintaining a perfectly flat RAM usage profile indefinitely. This effectively permits transferring multi-terabyte files on devices with strictly limited memory footprints while ensuring peak TCP throughput.
 
 ================================================================================
 6. CRYPTOGRAPHIC DATA INTEGRITY & VALIDATION
 ================================================================================
 
-Data corruption is a very real threat over unstable wireless mediums. ClipLAN utilizes the SHA-256 (Secure Hash Algorithm 256-bit) to guarantee mathematical perfection of all transmitted files.
+Data corruption is a threat over unstable wireless mediums. While the ClipLAN protocol was originally designed around SHA-256 (Secure Hash Algorithm 256-bit) to guarantee mathematical perfection, the current application operates exclusively in an optimized "Fast Mode".
 
-6.1 PRE-CALCULATION & TRANSMISSION
-Before the TCP engine begins streaming binary data, the sender's device scans the local file and calculates its SHA-256 digest. This 64-character hexadecimal string is injected into the `file_start` JSON control frame and sent to the receiver.
+6.1 FAST MODE & PERFORMANCE TRADE-OFFS
+Hashing massive, multi-gigabyte video files sequentially on mobile ARM processors can take significant time, noticeably draining the battery and causing an annoying "preparing..." delay before a transfer even begins to send data over the network. 
 
-6.2 CHUNKED CONVERSION
-Because the files can be gigabytes in size, the receiver cannot wait for the file to finish downloading to load it into memory and hash it. Instead, ClipLAN utilizes a `sha256.startChunkedConversion()` sink. As the Zero-Copy TCP stream pipes blocks of data to the hard drive, it simultaneously duplicates those blocks into the cryptographic sink in real-time. 
-
-6.3 FINAL VALIDATION
-The moment the final byte of the file is written, the cryptographic sink emits the final calculated hash. ClipLAN compares this calculated hash against the expected hash provided in the `file_start` packet. If they match identically, a `file_ack` control packet is dispatched to the sender marking success. If they differ, the file is immediately marked as corrupted and deleted, ensuring the user is never left with a broken file.
+To maximize the raw user experience and fully saturate Wi-Fi 6 networks immediately, ClipLAN explicitly bypasses local pre-calculation checksums. The sender injects a dummy `{ "hash": "disabled" }` property in the `file_start` JSON frame. The TCP protocol itself handles fundamental packet-level checksum verification (TCP Checksum) which is statistically sufficient for local LAN transfers. If future requirements mandate absolute zero-byte-variance guarantees (such as transmitting encrypted database backups), the SHA-256 stream transformer pipelines can be re-enabled.
 
 ================================================================================
 7. STORAGE, PERSISTENCE, & THE HISTORY ENGINE
@@ -121,12 +117,14 @@ A major architectural challenge in file sharing is the "Retry" mechanic. If a tr
 This robust path serialization spawned the "Recents" functionality. When a user opens the File Browser, ClipLAN queries the Hive database, extracts the physical paths of all files transferred in the last 7 days, cross-references those paths with the operating system to verify the files haven't been deleted or moved by the user, and dynamically populates a "Recents" grid. This allows for lightning-fast re-sharing of frequently sent documents.
 
 ================================================================================
-8. HARDWARE INTERACTION & WAKELOCK STABILITY
+8. HARDWARE INTERACTION, WAKELOCKS & BACKGROUND SERVICES
 ================================================================================
 
 Transferring heavy 4K videos or operating system images can take several minutes. Mobile operating systems (iOS and Android) are aggressively optimized for battery life. If a user puts their phone face down and the screen turns off, the OS will aggressively suspend the CPU and tear down active TCP sockets, instantly killing the transfer.
 
-To combat this, ClipLAN integrates deep hardware control via the `wakelock_plus` package. The `TransferService` maintains an internal `_activeTransferCount`. The moment a TCP socket is opened and data begins flowing, this count increments, and a hardware Wakelock is acquired. This explicitly instructs the OS kernel to keep the CPU awake and the Wi-Fi radio powered at maximum voltage, even if the screen turns off. The moment the transfer count hits 0 (whether through success, cancellation, or failure), the Wakelock is safely released, returning the device to its normal power-saving state.
+To combat this, ClipLAN strictly divides network responsibilities based on app lifecycle state. UDP Broadcasting (finding nearby devices and syncing clipboard text) only operates while the app is actively on-screen. When the user navigates away to the Home Screen, these lightweight UDP features instantly suspend to conserve battery.
+
+However, if a large file transfer is actively in progress, navigating away from the app triggers a completely different mechanism. ClipLAN dynamically spins up a persistent Foreground Service (`flutter_background_service`) and acquires a hardware Wakelock (`wakelock_plus`). This explicitly instructs the OS kernel to keep the CPU awake, the Wi-Fi radio powered at maximum voltage, and prevents the app from being killed in the background. The moment the file transfer completes (whether through success, cancellation, or failure), the background service is gracefully terminated and the Wakelock is safely released, returning the device to its normal power-saving state.
 
 ================================================================================
 9. OPERATING SYSTEM SANDBOXING & PERMISSIONS

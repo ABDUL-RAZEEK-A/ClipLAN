@@ -1,8 +1,12 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:open_filex/open_filex.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/transfer_item.dart';
 import '../theme/app_theme.dart';
+
+// Conditionally import android_intent_plus only on Android
+import 'package:android_intent_plus/android_intent.dart';
 
 /// Card showing an active transfer with progress bar.
 class TransferCard extends StatelessWidget {
@@ -34,6 +38,103 @@ class TransferCard extends StatelessWidget {
       case TransferStatus.pending:
         return AppColors.textTertiary;
     }
+  }
+
+  /// Open a received file using the system's default app.
+  void _openFile(BuildContext context, FileItem file) {
+    final path = file.path;
+    if (path == null || path.isEmpty) {
+      _showError(context, 'File path not available');
+      return;
+    }
+    final f = File(path);
+    if (!f.existsSync()) {
+      _showError(context, 'File not found at $path');
+      return;
+    }
+    OpenFilex.open(path, type: file.mime);
+  }
+
+  /// Show the folder containing received files.
+  /// On Android, uses an Intent to open the Downloads/file manager.
+  /// On other platforms, opens the directory directly.
+  void _showFolder(BuildContext context) {
+    // Determine the folder path from savedPath or from the first file's parent
+    String? folderPath = transfer.savedPath;
+    if ((folderPath == null || folderPath.isEmpty) && transfer.files.isNotEmpty) {
+      final firstFilePath = transfer.files.first.path;
+      if (firstFilePath != null && firstFilePath.isNotEmpty) {
+        folderPath = File(firstFilePath).parent.path;
+      }
+    }
+
+    if (folderPath == null || folderPath.isEmpty) {
+      _showError(context, 'Folder path not available');
+      return;
+    }
+
+    if (Platform.isAndroid) {
+      _openFolderAndroid(context, folderPath);
+    } else if (Platform.isMacOS) {
+      // macOS: use 'open' command to reveal in Finder
+      Process.run('open', [folderPath]);
+    } else if (Platform.isWindows) {
+      Process.run('explorer', [folderPath]);
+    } else if (Platform.isLinux) {
+      Process.run('xdg-open', [folderPath]);
+    } else {
+      // Fallback: try url_launcher
+      launchUrl(Uri.directory(folderPath));
+    }
+  }
+
+  /// Android-specific: launch the system file manager to the Downloads directory.
+  /// OpenFilex.open(directory) doesn't work on Android, so we use an explicit Intent.
+  void _openFolderAndroid(BuildContext context, String folderPath) async {
+    try {
+      // Try opening the system Downloads app / file manager via Intent
+      const intent = AndroidIntent(
+        action: 'android.intent.action.VIEW',
+        data: 'content://com.android.externalstorage.documents/document/primary:Download/ClipLAN',
+        type: 'vnd.android.document/directory',
+        flags: <int>[268435456], // FLAG_ACTIVITY_NEW_TASK
+      );
+      await intent.launch();
+    } catch (_) {
+      // Fallback 1: Try opening generic file manager
+      try {
+        const fallbackIntent = AndroidIntent(
+          action: 'android.intent.action.VIEW',
+          data: 'content://com.android.externalstorage.documents/root/primary',
+          type: 'vnd.android.document/root',
+          flags: <int>[268435456],
+        );
+        await fallbackIntent.launch();
+      } catch (_) {
+        // Fallback 2: Try OpenFilex on the first file directly
+        if (transfer.files.isNotEmpty) {
+          final firstFile = transfer.files.first;
+          if (firstFile.path != null && firstFile.path!.isNotEmpty) {
+            OpenFilex.open(firstFile.path!, type: firstFile.mime);
+            return;
+          }
+        }
+        if (context.mounted) {
+          _showError(context, 'Could not open file manager');
+        }
+      }
+    }
+  }
+
+  void _showError(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.error,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
   }
 
   @override
@@ -84,7 +185,7 @@ class TransferCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${isSending ? "Sending to" : "Receiving from"} ${transfer.deviceName}',
+                      '${transfer.status == TransferStatus.completed ? (isSending ? "Sent to" : "Received from") : (isSending ? "Sending to" : "Receiving from")} ${transfer.deviceName}',
                       style: const TextStyle(
                         color: AppColors.textPrimary,
                         fontWeight: FontWeight.w600,
@@ -261,8 +362,8 @@ class TransferCard extends StatelessWidget {
                   transfer.checksumValid == null
                       ? 'Transferred (Fast mode)'
                       : (transfer.checksumValid!
-                            ? 'Checksum verified ✓'
-                            : 'Checksum mismatch'),
+                            ? 'SHA-256 checksum verified ✓'
+                            : 'Checksum mismatch ⚠'),
                   style: TextStyle(
                     color: transfer.checksumValid == null
                         ? AppColors.primaryLight
@@ -286,12 +387,7 @@ class TransferCard extends StatelessWidget {
                 if (transfer.files.length == 1) ...[
                   Expanded(
                     child: TextButton.icon(
-                      onPressed: () {
-                        final file = transfer.files.first;
-                        if (file.path != null) {
-                          OpenFilex.open(file.path!);
-                        }
-                      },
+                      onPressed: () => _openFile(context, transfer.files.first),
                       icon: const Icon(Icons.file_open_rounded, size: 16),
                       label: const Text('Open File'),
                       style: TextButton.styleFrom(
@@ -310,13 +406,7 @@ class TransferCard extends StatelessWidget {
                 ],
                 Expanded(
                   child: TextButton.icon(
-                    onPressed: () {
-                      final file = transfer.files.first;
-                      if (file.path != null) {
-                        final parentDir = File(file.path!).parent.path;
-                        OpenFilex.open(parentDir);
-                      }
-                    },
+                    onPressed: () => _showFolder(context),
                     icon: const Icon(Icons.folder_open_rounded, size: 16),
                     label: const Text('Show Folder'),
                     style: TextButton.styleFrom(

@@ -73,6 +73,8 @@ class TransferItem {
   DateTime? endTime;
   Socket? socket;
   bool? checksumValid;
+  /// Directory where received files are saved (for "Show Folder" action).
+  String? savedPath;
 
   TransferItem({
     required this.id,
@@ -88,6 +90,7 @@ class TransferItem {
     this.endTime,
     this.socket,
     this.checksumValid,
+    this.savedPath,
   }) : startTime = startTime ?? DateTime.now();
 
   int get totalSize => files.fold(0, (sum, f) => sum + f.size);
@@ -137,6 +140,7 @@ class TransferItem {
     'startTime': startTime.toIso8601String(),
     'endTime': endTime?.toIso8601String(),
     'checksumValid': checksumValid,
+    if (savedPath != null) 'savedPath': savedPath,
   };
 
   factory TransferItem.fromHistoryJson(Map<String, dynamic> json) {
@@ -154,7 +158,8 @@ class TransferItem {
       endTime: json['endTime'] != null
           ? DateTime.parse(json['endTime'] as String)
           : null,
-      checksumValid: json['checksumValid'] as bool? ?? true,
+      checksumValid: json['checksumValid'] as bool?,
+      savedPath: json['savedPath'] as String?,
     );
   }
 }

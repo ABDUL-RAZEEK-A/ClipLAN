@@ -26,12 +26,14 @@ class _ClipboardScreenState extends State<ClipboardScreen>
     super.initState();
     _tabCtrl = TabController(length: 2, vsync: this);
     _tabCtrl.addListener(() {
-      setState(() {});
+      if (mounted) setState(() {});
     });
     _searchCtrl.addListener(() {
-      setState(() {
-        _searchQuery = _searchCtrl.text.trim().toLowerCase();
-      });
+      if (mounted) {
+        setState(() {
+          _searchQuery = _searchCtrl.text.trim().toLowerCase();
+        });
+      }
     });
   }
 

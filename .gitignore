@@ -241,3 +241,7 @@ obj/
 *~
 *.swx
 .DS_Store
+
+# Excluded
+strix_repo/
+*.dmg

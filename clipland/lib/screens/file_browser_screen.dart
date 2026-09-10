@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -8,8 +7,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
-import 'package:installed_apps/installed_apps.dart';
-import 'package:installed_apps/app_info.dart';
 import '../providers/app_state.dart';
 import '../models/transfer_item.dart';
 import '../theme/app_theme.dart';
@@ -20,8 +17,6 @@ enum FileCategory {
   videos,
   audio,
   documents,
-  apks,
-  installedApps,
   all,
 }
 
@@ -35,6 +30,7 @@ class ScannedFile {
   final int size;
   final int modifiedMs;
   final Uint8List? appIcon;
+  final bool isDir;
 
   ScannedFile({
     required this.path,
@@ -42,6 +38,7 @@ class ScannedFile {
     required this.size,
     required this.modifiedMs,
     this.appIcon,
+    this.isDir = false,
   });
 }
 
@@ -50,24 +47,21 @@ class ScanResult {
   final List<ScannedFile> videos;
   final List<ScannedFile> audio;
   final List<ScannedFile> documents;
-  final List<ScannedFile> apks;
 
   ScanResult({
     required this.images,
     required this.videos,
     required this.audio,
     required this.documents,
-    required this.apks,
   });
 }
 
 // Background isolate scanner
-ScanResult _scanDirectoriesBackground(List<String> roots) {
+Future<ScanResult> _scanDirectoriesBackground(List<String> roots) async {
   final images = <ScannedFile>[];
   final videos = <ScannedFile>[];
   final audio = <ScannedFile>[];
   final documents = <ScannedFile>[];
-  final apks = <ScannedFile>[];
 
   final imageExts = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'};
   final videoExts = {'.mp4', '.mkv', '.avi', '.mov', '.webm'};
@@ -82,19 +76,17 @@ ScanResult _scanDirectoriesBackground(List<String> roots) {
     '.pptx',
     '.txt',
   };
-  final apkExts = {'.apk'};
 
   for (final rootPath in roots) {
     final dir = Directory(rootPath);
     if (!dir.existsSync()) continue;
 
     try {
-      final entities = dir.listSync(recursive: true, followLinks: false);
-      for (final entity in entities) {
+      await for (final entity in dir.list(recursive: true, followLinks: false)) {
         if (entity is File) {
           final path = entity.path;
-          // Skip hidden files/folders
-          if (path.contains('/.')) continue;
+          // Skip hidden files/folders and protected Android system directories
+          if (path.contains('/.') || path.contains('Android/data') || path.contains('Android/obb')) continue;
 
           final lowerPath = path.toLowerCase();
           final ext = lowerPath.substring(
@@ -104,10 +96,9 @@ ScanResult _scanDirectoriesBackground(List<String> roots) {
           if (imageExts.contains(ext) ||
               videoExts.contains(ext) ||
               audioExts.contains(ext) ||
-              docExts.contains(ext) ||
-              apkExts.contains(ext)) {
+              docExts.contains(ext)) {
             try {
-              final stat = entity.statSync();
+              final stat = await entity.stat();
               final sf = ScannedFile(
                 path: path,
                 name: path.split(Platform.pathSeparator).last,
@@ -115,16 +106,15 @@ ScanResult _scanDirectoriesBackground(List<String> roots) {
                 modifiedMs: stat.modified.millisecondsSinceEpoch,
               );
 
-              if (imageExts.contains(ext))
+              if (imageExts.contains(ext)) {
                 images.add(sf);
-              else if (videoExts.contains(ext))
+              } else if (videoExts.contains(ext)) {
                 videos.add(sf);
-              else if (audioExts.contains(ext))
+              } else if (audioExts.contains(ext)) {
                 audio.add(sf);
-              else if (docExts.contains(ext))
+              } else if (docExts.contains(ext)) {
                 documents.add(sf);
-              else if (apkExts.contains(ext))
-                apks.add(sf);
+              }
             } catch (_) {}
           }
         }
@@ -139,7 +129,6 @@ ScanResult _scanDirectoriesBackground(List<String> roots) {
     videos: videos,
     audio: audio,
     documents: documents,
-    apks: apks,
   );
 }
 
@@ -156,8 +145,8 @@ class _InAppFileBrowserState extends State<InAppFileBrowser> {
   // Navigation & State
   Directory? _currentDir;
   Directory? _trueRootDir;
-  List<FileSystemEntity> _currentDirEntities = [];
-  final List<File> _selectedFiles = [];
+  List<ScannedFile> _currentDirEntities = [];
+  final List<ScannedFile> _selectedFiles = [];
   bool _isLoading = true;
   bool _isScanning = false;
   bool _hasPermission = false;
@@ -176,7 +165,9 @@ class _InAppFileBrowserState extends State<InAppFileBrowser> {
   @override
   void initState() {
     super.initState();
-    _initBrowser();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initBrowser();
+    });
   }
 
   @override
@@ -218,18 +209,18 @@ class _InAppFileBrowserState extends State<InAppFileBrowser> {
       if (homePath != null) {
         rootDir = Directory(homePath);
       } else {
-        rootDir =
-            await getDownloadsDirectory() ??
-            await getApplicationDocumentsDirectory();
+        final downloadDir = await getDownloadsDirectory();
+        final docDir = await getApplicationDocumentsDirectory();
+        rootDir = (downloadDir != null && downloadDir.existsSync()) ? downloadDir : docDir;
       }
-      scanRoots = [rootDir!.path];
+      scanRoots = [rootDir.path];
     }
 
     if (rootDir != null) {
       _trueRootDir = rootDir;
       _navigateTo(rootDir);
     } else {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
 
     // Start background scan for categories
@@ -253,7 +244,7 @@ class _InAppFileBrowserState extends State<InAppFileBrowser> {
     }
   }
 
-  void _navigateTo(Directory dir) {
+  Future<void> _navigateTo(Directory dir) async {
     setState(() {
       _isLoading = true;
       _currentDir = dir;
@@ -263,18 +254,34 @@ class _InAppFileBrowserState extends State<InAppFileBrowser> {
     });
 
     try {
-      final entities = dir.listSync().where((e) {
+      final entities = await dir.list().where((e) {
         final name = e.path.split(Platform.pathSeparator).last;
         return !name.startsWith('.');
       }).toList();
 
-      setState(() {
-        _currentDirEntities = entities;
-        _isLoading = false;
-      });
+      final scanned = <ScannedFile>[];
+      for (final e in entities) {
+        try {
+          final stat = await e.stat();
+          scanned.add(ScannedFile(
+            path: e.path,
+            name: e.path.split(Platform.pathSeparator).last,
+            size: stat.size,
+            modifiedMs: stat.modified.millisecondsSinceEpoch,
+            isDir: e is Directory,
+          ));
+        } catch (_) {}
+      }
+
+      if (mounted) {
+        setState(() {
+          _currentDirEntities = scanned;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       debugPrint('[InAppBrowser] Error reading directory: $e');
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -327,7 +334,7 @@ class _InAppFileBrowserState extends State<InAppFileBrowser> {
     });
   }
 
-  void _loadRecents() {
+  Future<void> _loadRecents() async {
     final appState = Provider.of<AppState>(context, listen: false);
     final Set<String> uniquePaths = {};
     final recents = <ScannedFile>[];
@@ -338,8 +345,8 @@ class _InAppFileBrowserState extends State<InAppFileBrowser> {
           if (file.path != null && !uniquePaths.contains(file.path)) {
             uniquePaths.add(file.path!);
             try {
-              final stat = File(file.path!).statSync();
-              if (stat.type != FileSystemEntityType.notFound) {
+              final f = File(file.path!);
+              if (await f.exists()) {
                 recents.add(
                   ScannedFile(
                     path: file.path!,
@@ -356,14 +363,18 @@ class _InAppFileBrowserState extends State<InAppFileBrowser> {
     }
 
     recents.sort((a, b) => b.modifiedMs.compareTo(a.modifiedMs));
-    _activeCategoryFiles = recents;
+    if (mounted) {
+      setState(() {
+        _activeCategoryFiles = recents;
+      });
+    }
   }
 
   void _updateActiveCategoryList() {
     if (_scanResult == null &&
-        _currentCategory != FileCategory.recents &&
-        _currentCategory != FileCategory.installedApps)
+        _currentCategory != FileCategory.recents) {
       return;
+    }
     switch (_currentCategory) {
       case FileCategory.recents:
         _loadRecents();
@@ -380,70 +391,18 @@ class _InAppFileBrowserState extends State<InAppFileBrowser> {
       case FileCategory.documents:
         _activeCategoryFiles = _scanResult!.documents;
         break;
-      case FileCategory.apks:
-        _activeCategoryFiles = _scanResult!.apks;
-        break;
-      case FileCategory.installedApps:
-        _activeCategoryFiles = [];
-        _loadInstalledApps();
-        break;
       case FileCategory.all:
         _activeCategoryFiles = [];
         break;
     }
   }
 
-  static const _apkChannel = MethodChannel('com.cliplan/apkPaths');
-
-  Future<void> _loadInstalledApps() async {
-    setState(() => _isLoading = true);
-    try {
-      final apps = await InstalledApps.getInstalledApps(true, true);
-
-      Map<dynamic, dynamic> pathsMap = {};
-      if (Platform.isAndroid) {
-        pathsMap = await _apkChannel.invokeMethod('getApkPaths');
-      }
-
-      final List<ScannedFile> appFiles = [];
-      for (final app in apps) {
-        final apkPath = pathsMap[app.packageName];
-        if (apkPath != null) {
-          int size = 0;
-          try {
-            size = File(apkPath).lengthSync();
-          } catch (_) {}
-          appFiles.add(
-            ScannedFile(
-              path: apkPath,
-              name: '${app.name ?? "UnknownApp"}.apk',
-              size: size,
-              modifiedMs: DateTime.now().millisecondsSinceEpoch,
-              appIcon: app.icon,
-            ),
-          );
-        }
-      }
-      appFiles.sort(
-        (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
-      );
-      if (mounted && _currentCategory == FileCategory.installedApps) {
-        setState(() {
-          _activeCategoryFiles = appFiles;
-          _isLoading = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  void _toggleSelection(String path) {
+  void _toggleSelection(ScannedFile file) {
     setState(() {
-      if (_selectedFiles.any((f) => f.path == path)) {
-        _selectedFiles.removeWhere((f) => f.path == path);
+      if (_selectedFiles.any((f) => f.path == file.path)) {
+        _selectedFiles.removeWhere((f) => f.path == file.path);
       } else {
-        _selectedFiles.add(File(path));
+        _selectedFiles.add(file);
       }
     });
   }
@@ -452,8 +411,8 @@ class _InAppFileBrowserState extends State<InAppFileBrowser> {
     if (_selectedFiles.isNotEmpty) {
       final platformFiles = _selectedFiles.map((f) {
         return PlatformFile(
-          name: f.path.split(Platform.pathSeparator).last,
-          size: f.lengthSync(),
+          name: f.name,
+          size: f.size,
           path: f.path,
         );
       }).toList();
@@ -465,96 +424,59 @@ class _InAppFileBrowserState extends State<InAppFileBrowser> {
   String _formatSize(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024)
+    if (bytes < 1024 * 1024 * 1024) {
       return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 
   int get _totalSize {
     int sum = 0;
     for (var f in _selectedFiles) {
-      try {
-        sum += f.lengthSync();
-      } catch (_) {}
+      sum += f.size;
     }
     return sum;
   }
 
   // --- Filter and Sort Logic ---
 
-  List<dynamic> _getFilteredAndSortedItems() {
-    List<dynamic> items = [];
+  List<ScannedFile> _getFilteredAndSortedItems() {
+    List<ScannedFile> items;
 
     if (_currentCategory == FileCategory.all) {
-      items = List<FileSystemEntity>.from(_currentDirEntities);
-
-      // Search filter
-      if (_searchQuery.isNotEmpty) {
-        final query = _searchQuery.toLowerCase();
-        items = items.where((e) {
-          final name = e.path.split(Platform.pathSeparator).last.toLowerCase();
-          return name.contains(query);
-        }).toList();
-      }
-
-      // Sort
-      items.sort((a, b) {
-        final aIsDir = a is Directory;
-        final bIsDir = b is Directory;
-        if (aIsDir && !bIsDir) return -1; // folders always first
-        if (!aIsDir && bIsDir) return 1;
-
-        final nameA = a.path.split(Platform.pathSeparator).last;
-        final nameB = b.path.split(Platform.pathSeparator).last;
-
-        if (_currentSort == SortOption.nameAsc) return nameA.compareTo(nameB);
-        if (_currentSort == SortOption.nameDesc) return nameB.compareTo(nameA);
-
-        try {
-          final statA = a.statSync();
-          final statB = b.statSync();
-          if (_currentSort == SortOption.sizeDesc)
-            return statB.size.compareTo(statA.size);
-          if (_currentSort == SortOption.sizeAsc)
-            return statA.size.compareTo(statB.size);
-          if (_currentSort == SortOption.dateDesc)
-            return statB.modified.compareTo(statA.modified);
-          if (_currentSort == SortOption.dateAsc)
-            return statA.modified.compareTo(statB.modified);
-        } catch (_) {}
-        return 0;
-      });
+      items = List<ScannedFile>.from(_currentDirEntities);
     } else {
       items = List<ScannedFile>.from(_activeCategoryFiles);
-
-      // Search filter
-      if (_searchQuery.isNotEmpty) {
-        final query = _searchQuery.toLowerCase();
-        items = items
-            .where((e) => e.name.toLowerCase().contains(query))
-            .toList();
-      }
-
-      // Sort
-      items.sort((a, b) {
-        a as ScannedFile;
-        b as ScannedFile;
-        switch (_currentSort) {
-          case SortOption.nameAsc:
-            return a.name.compareTo(b.name);
-          case SortOption.nameDesc:
-            return b.name.compareTo(a.name);
-          case SortOption.sizeDesc:
-            return b.size.compareTo(a.size);
-          case SortOption.sizeAsc:
-            return a.size.compareTo(b.size);
-          case SortOption.dateDesc:
-            return b.modifiedMs.compareTo(a.modifiedMs);
-          case SortOption.dateAsc:
-            return a.modifiedMs.compareTo(b.modifiedMs);
-        }
-      });
     }
+
+    // Search filter
+    if (_searchQuery.isNotEmpty) {
+      final query = _searchQuery.toLowerCase();
+      items = items.where((e) {
+        return e.name.toLowerCase().contains(query);
+      }).toList();
+    }
+
+    // Sort
+    items.sort((a, b) {
+      if (a.isDir && !b.isDir) return -1; // folders always first
+      if (!a.isDir && b.isDir) return 1;
+
+      switch (_currentSort) {
+        case SortOption.nameAsc:
+          return a.name.compareTo(b.name);
+        case SortOption.nameDesc:
+          return b.name.compareTo(a.name);
+        case SortOption.sizeDesc:
+          return b.size.compareTo(a.size);
+        case SortOption.sizeAsc:
+          return a.size.compareTo(b.size);
+        case SortOption.dateDesc:
+          return b.modifiedMs.compareTo(a.modifiedMs);
+        case SortOption.dateAsc:
+          return a.modifiedMs.compareTo(b.modifiedMs);
+      }
+    });
 
     return items;
   }
@@ -592,16 +514,6 @@ class _InAppFileBrowserState extends State<InAppFileBrowser> {
         'val': FileCategory.documents,
         'label': 'Docs',
         'icon': Icons.description_rounded,
-      },
-      {
-        'val': FileCategory.apks,
-        'label': 'APKs',
-        'icon': Icons.android_rounded,
-      },
-      {
-        'val': FileCategory.installedApps,
-        'label': 'Apps',
-        'icon': Icons.apps_rounded,
       },
     ];
 
@@ -868,8 +780,8 @@ class _InAppFileBrowserState extends State<InAppFileBrowser> {
                                 Icon(
                                   Icons.search_off_rounded,
                                   size: 64,
-                                  color: AppColors.textTertiary.withOpacity(
-                                    0.5,
+                                  color: AppColors.textTertiary.withValues(
+                                    alpha: 0.5,
                                   ),
                                 ),
                                 const SizedBox(height: 16),
@@ -993,19 +905,8 @@ class _InAppFileBrowserState extends State<InAppFileBrowser> {
     int dateMs = 0;
     Uint8List? appIcon;
 
-    if (item is FileSystemEntity) {
-      isDir = item is Directory;
-      path = item.path;
-      name = item.path.split(Platform.pathSeparator).last;
-      if (!isDir) {
-        try {
-          final stat = item.statSync();
-          size = stat.size;
-          dateMs = stat.modified.millisecondsSinceEpoch;
-        } catch (_) {}
-      }
-    } else if (item is ScannedFile) {
-      isDir = false;
+    if (item is ScannedFile) {
+      isDir = item.isDir;
       path = item.path;
       name = item.name;
       size = item.size;
@@ -1134,9 +1035,9 @@ class _InAppFileBrowserState extends State<InAppFileBrowser> {
             ),
       onTap: () {
         if (data['isDir']) {
-          _navigateTo(data['originalItem'] as Directory);
+          _navigateTo(Directory(data['path']));
         } else {
-          _toggleSelection(data['path']);
+          _toggleSelection(data['originalItem'] as ScannedFile);
         }
       },
     );
@@ -1148,9 +1049,9 @@ class _InAppFileBrowserState extends State<InAppFileBrowser> {
     return GestureDetector(
       onTap: () {
         if (data['isDir']) {
-          _navigateTo(data['originalItem'] as Directory);
+          _navigateTo(Directory(data['path']));
         } else {
-          _toggleSelection(data['path']);
+          _toggleSelection(data['originalItem'] as ScannedFile);
         }
       },
       child: Container(
