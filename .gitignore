@@ -245,3 +245,7 @@ obj/
 # Excluded
 strix_repo/
 *.dmg
+
+# Allow Final Launches directory
+!Final Launches/
+!Final Launches/**
