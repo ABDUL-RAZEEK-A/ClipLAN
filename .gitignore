@@ -1,251 +1,84 @@
-# ==============================================================================
-# Generic Root-Level .gitignore for Common Development Environments
-# ==============================================================================
-
-# ------------------------------------------------------------------------------
-# Operating System Files
-# ------------------------------------------------------------------------------
-# macOS
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-ehthumbs_vista.db
-[Tt]humbs.db
-[Dd]esktop.ini
+.atom/
+.buildlog/
+.history
+.svn/
 
-# Linux
-*~
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
 
-# Windows
-Thumbs.db
-Thumbs.db:encryptable
-ehthumbs.db
-ehthumbs_vista.db
-$RECYCLE.BIN/
-
-# ------------------------------------------------------------------------------
-# IDEs & Editors
-# ------------------------------------------------------------------------------
-# VS Code
-.vscode/*
+# The .vscode folder contains project-specific workspace settings,
+# and most of the time you want to share them with other developers.
+# However, you might want to ignore some specific files:
+.vscode/
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
 *.code-workspace
 
-# IntelliJ / JetBrains (WebStorm, PyCharm, etc)
-.idea/
-*.iml
-*.iws
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+clipland/build/
 
-# Eclipse
-.metadata
-bin/
-tmp/
-*.tmp
-*.bak
-*.swp
-*~.nib
-local.properties
-.settings/
-.loadpath
-.recommenders
+# Android related
+**/android/**/gradle-wrapper.jar
+**/android/.gradle
+**/android/captures/
+**/android/gradlew
+**/android/gradlew.bat
+**/android/local.properties
+**/android/**/GeneratedPluginRegistrant.java
 
-# Sublime Text
-*.sublime-workspace
+# iOS/XCode related
+**/ios/**/*.mode1v3
+**/ios/**/*.mode2v3
+**/ios/**/*.moved-aside
+**/ios/**/*.pbxuser
+**/ios/**/*.perspectivev3
+**/ios/**/*.-sync/
+**/ios/**/.macports/*
+**/ios/**/.DS_Store
+**/ios/**/xcuserdata/
+**/ios/**/profile
+**/ios/**/DerivedData/
+**/ios/**/Flutter/App.framework
+**/ios/**/Flutter/Flutter.framework
+**/ios/**/Flutter/Flutter.podspec
+**/ios/**/Flutter/Generated.xcconfig
+**/ios/**/Flutter/app.flx
+**/ios/**/Flutter/app.zip
+**/ios/**/Flutter/flutter_assets/
+**/ios/**/Flutter/flutter_export_environment.sh
+**/ios/**/ServiceDefinitions.json
+**/ios/**/Pods/
+**/ios/**/.symlinks/
 
-# Vim
-.*.sw[a-p]
-*.un~
+# macOS
+**/macos/Flutter/ephemeral
+**/macos/Flutter/GeneratedPluginRegistrant.swift
+**/macos/**/xcuserdata/
 
-# Xcode
-build/
-*.pbxuser
-!default.pbxuser
-*.mode1v3
-!default.mode1v3
-*.mode2v3
-!default.mode2v3
-*.perspectivev3
-!default.perspectivev3
-xcuserdata/
-*.xccheckout
-*.moved-aside
-DerivedData/
-*.hmap
-*.ipa
-*.xcuserstate
+# Web
+**/web/build/
 
-# ------------------------------------------------------------------------------
-# Node.js
-# ------------------------------------------------------------------------------
-node_modules/
-npm-debug.log
-yarn-error.log
-yarn-debug.log
-.pnpm-debug.log
-pnpm-debug.log
-.yarn/
-!.yarn/releases
-!.yarn/plugins
-!.yarn/sdks
-!.yarn/versions
-.pnp.*
-dist/
-build/
-out/
-.nuxt/
-.next/
-coverage/
-.cache/
-
-# ------------------------------------------------------------------------------
-# Python
-# ------------------------------------------------------------------------------
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-.env/
-.venv/
-pip-log.txt
-pip-delete-this-directory.txt
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.log
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-celerybeat-schedule
-
-# ------------------------------------------------------------------------------
-# Java / Kotlin
-# ------------------------------------------------------------------------------
-*.class
-*.log
-*.ctxt
-.mtj.tmp/
-*.jar
-*.war
-*.nar
-*.ear
-*.zip
-*.tar.gz
-*.rar
-
-# Gradle
-.gradle/
-build/
-!gradle/wrapper/gradle-wrapper.jar
-
-# Maven
-target/
-pom.xml.tag
-pom.xml.releaseBackup
-pom.xml.versionsBackup
-pom.xml.next
-release.properties
-dependency-reduced-pom.xml
-buildNumber.properties
-.mvn/timing.properties
-.mvn/wrapper/maven-wrapper.jar
-
-# ------------------------------------------------------------------------------
-# C / C++
-# ------------------------------------------------------------------------------
-*.o
-*.obj
-*.out
-*.app
-*.i
-*.s
-*.a
-*.lib
-*.so
-*.dll
-*.dylib
-*.exe
-*.com
-*.class
-*.pyc
-
-# ------------------------------------------------------------------------------
-# Go
-# ------------------------------------------------------------------------------
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-*.test
-*.out
-
-# ------------------------------------------------------------------------------
-# Rust
-# ------------------------------------------------------------------------------
-/target/
-**/*.rs.bk
-
-# ------------------------------------------------------------------------------
-# Logs & Databases
-# ------------------------------------------------------------------------------
-*.sqlite
-*.db
-*.sqlite3
-
-# ------------------------------------------------------------------------------
-# Environments & Secrets
-# ------------------------------------------------------------------------------
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-*.pem
-*.key
-*.cert
-*.crt
-*.p12
-
-# ------------------------------------------------------------------------------
-# Android
-# ------------------------------------------------------------------------------
-# Built application files
-*.apk
-*.ap_
-*.aab
-
-# local configuration file (sdk path, etc)
-local.properties
-
-# NDK
-obj/
-
-# ------------------------------------------------------------------------------
-# Other generic files
-# ------------------------------------------------------------------------------
-*.bak
-*.swp
-*~
-*.swx
-.DS_Store
-
-# Excluded
-strix_repo/
-*.dmg
-
-# Allow Final Launches directory
-!Final Launches/
-!Final Launches/**
+# Windows
+**/windows/flutter/ephemeral
+**/windows/flutter/generated_plugin_registrant.cc
+**/windows/flutter/generated_plugin_registrant.h
+**/windows/flutter/generated_plugins.cmake
