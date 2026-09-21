@@ -21,6 +21,15 @@
 
 ---
 
+## 📥 Download
+
+Get the latest stable release for your platform from the GitHub Releases Page.
+
+- **Android (APK):** [Download Android APK (v4.3.0)](https://github.com/ABDUL-RAZEEK-A/ClipLAN/releases/tag/v4.3.0)
+- **macOS (DMG):** [Download macOS DMG (v4.3.0)](https://github.com/ABDUL-RAZEEK-A/ClipLAN/releases/tag/v4.3.0_dmg)
+
+---
+
 ## 📖 Developer Story
 
 ### Why We Built It
