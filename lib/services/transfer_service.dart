@@ -151,8 +151,7 @@ class ConnectionReader {
     int speedLimitMBps = 0,
   }) async {
     int getDynamicChunkSize() {
-      if (speedLimitMBps <= 0)
-        return 8 * 1024 * 1024; // 8MB for max throughput on eMMC
+      if (speedLimitMBps <= 0) return 8 * 1024 * 1024; // 8MB for max throughput on eMMC
       int targetMB = (speedLimitMBps / 2).floor();
       if (targetMB < 1) targetMB = 1;
       if (targetMB > 10) targetMB = 10;
@@ -273,18 +272,10 @@ Future<void> _serverIsolateEntryPoint(ServerIsolateStartConfig config) async {
 
   ServerSocket? server;
   try {
-    server = await ServerSocket.bind(
-      InternetAddress.anyIPv4,
-      config.port,
-      shared: true,
-    );
+    server = await ServerSocket.bind(InternetAddress.anyIPv4, config.port, shared: true);
   } catch (_) {
     try {
-      server = await ServerSocket.bind(
-        InternetAddress.anyIPv4,
-        0,
-        shared: true,
-      );
+      server = await ServerSocket.bind(InternetAddress.anyIPv4, 0, shared: true);
     } catch (e) {
       config.mainSendPort.send({'type': 'error', 'msg': e.toString()});
       return;

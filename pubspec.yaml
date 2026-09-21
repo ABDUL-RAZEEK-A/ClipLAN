@@ -1,7 +1,7 @@
 name: cliplan
 description: "ClipLAN - Local file sharing"
 publish_to: 'none'
-version: 4.2.6+5
+version: 4.3.0+6
 
 environment:
   sdk: ^3.8.0
