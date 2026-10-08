@@ -307,13 +307,32 @@ class _DevicesScreenState extends State<DevicesScreen> {
                     title: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        ShaderMask(
-                          shaderCallback: (b) =>
-                              AppColors.gradientPrimary.createShader(b),
-                          child: const Icon(
-                            Icons.share_rounded,
-                            color: Colors.white,
-                            size: 28,
+                        Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(7),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primaryLight.withValues(alpha: 0.35),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: Image.asset(
+                            'logo.jpeg',
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => ShaderMask(
+                              shaderCallback: (b) =>
+                                  AppColors.gradientPrimary.createShader(b),
+                              child: const Icon(
+                                Icons.share_rounded,
+                                color: Colors.white,
+                                size: 28,
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 10),

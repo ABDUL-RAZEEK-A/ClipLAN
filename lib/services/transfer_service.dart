@@ -3,8 +3,8 @@ import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../models/device_info.dart';
@@ -263,6 +263,41 @@ Future<void> _sendMessage(Socket socket, Map<String, dynamic> message) async {
   await socket.flush(); // Ensure message is flushed for reliability
 }
 
+String _sanitizeFileName(String name) {
+  var clean = name.replaceAll(RegExp(r'[\\/:*?"<>|\r\n\t]'), '_').trim();
+  while (clean.startsWith('.')) {
+    clean = clean.substring(1);
+  }
+  if (clean.isEmpty) {
+    clean = 'file_${DateTime.now().millisecondsSinceEpoch}';
+  }
+  return clean;
+}
+
+String _resolveUniqueFilePath(String savePath, String rawName) {
+  final cleanName = _sanitizeFileName(rawName);
+  final separator = Platform.pathSeparator;
+  final dirPath = savePath.endsWith(separator) || savePath.endsWith('/') || savePath.endsWith('\\')
+      ? savePath.substring(0, savePath.length - 1)
+      : savePath;
+
+  var candidate = '$dirPath$separator$cleanName';
+  var file = File(candidate);
+  if (!file.existsSync()) return candidate;
+
+  final dotIndex = cleanName.lastIndexOf('.');
+  final baseName = dotIndex > 0 ? cleanName.substring(0, dotIndex) : cleanName;
+  final extension = dotIndex > 0 ? cleanName.substring(dotIndex) : '';
+
+  int counter = 1;
+  while (file.existsSync()) {
+    candidate = '$dirPath$separator${baseName}_$counter$extension';
+    file = File(candidate);
+    counter++;
+  }
+  return candidate;
+}
+
 // ---------------------------------------------------------
 // RECEIVER ISOLATE
 // ---------------------------------------------------------
@@ -354,13 +389,15 @@ Future<void> _serverIsolateEntryPoint(ServerIsolateStartConfig config) async {
 
       for (int fileIndex = 0; fileIndex < files.length; fileIndex++) {
         final fileMetadata = files[fileIndex];
-        final fileName = fileMetadata['name'];
-        final fileSize = fileMetadata['size'];
-        final filePath = "${config.savePath}/$fileName";
+        final rawFileName = fileMetadata['name']?.toString() ?? 'file';
+        final fileSize = fileMetadata['size'] as int;
+        final filePath = _resolveUniqueFilePath(config.savePath, rawFileName);
         final file = File(filePath);
+        if (!file.parent.existsSync()) {
+          file.parent.createSync(recursive: true);
+        }
         final sink = file.openWrite();
 
-        DateTime lastUpdate = DateTime.now();
         int bytesSinceUpdate = 0;
 
         // Stream file data
@@ -396,11 +433,20 @@ Future<void> _serverIsolateEntryPoint(ServerIsolateStartConfig config) async {
         await sink.flush();
         await sink.close();
 
-        // Verify file size
-        final downloadedSize = await file.length();
+        // Verify file size with retry (protects against antivirus / indexing locking on Windows)
+        int downloadedSize = -1;
+        for (int retry = 0; retry < 5; retry++) {
+          try {
+            downloadedSize = await file.length();
+            if (downloadedSize == fileSize) break;
+          } catch (_) {
+            await Future.delayed(const Duration(milliseconds: 50));
+          }
+        }
+
         if (downloadedSize != fileSize) {
           throw Exception(
-            'File size mismatch for $fileName. Expected $fileSize, got $downloadedSize.',
+            'File size mismatch for $rawFileName. Expected $fileSize, got $downloadedSize.',
           );
         }
 
@@ -415,14 +461,18 @@ Future<void> _serverIsolateEntryPoint(ServerIsolateStartConfig config) async {
         // Send per-file acknowledgment back to sender
         await _sendMessage(socket, {
           'type': 'file_ack',
-          'fileName': fileName,
+          'fileName': rawFileName,
           'checksumValid': checksumValid,
         });
+
+        final actualFileName = file.uri.pathSegments.isNotEmpty
+            ? file.uri.pathSegments.last
+            : rawFileName;
 
         config.mainSendPort.send({
           'type': 'file_completed',
           'transferId': transferId,
-          'fileName': fileName,
+          'fileName': actualFileName,
           'path': filePath,
           'fileIndex': fileIndex,
           'checksumValid': null, // Fast mode

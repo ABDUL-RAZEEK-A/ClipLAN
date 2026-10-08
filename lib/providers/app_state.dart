@@ -176,7 +176,8 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
         if (Platform.isAndroid) {
           storage.savePath = '/storage/emulated/0/Download/ClipLAN';
         } else {
-          final dir = await getApplicationDocumentsDirectory();
+          final dir = await getDownloadsDirectory() ??
+              await getApplicationDocumentsDirectory();
           storage.savePath = '${dir.path}/ClipLAN';
         }
       }

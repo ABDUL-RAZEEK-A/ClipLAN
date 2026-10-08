@@ -61,32 +61,32 @@ class _UsernameDialogState extends State<UsernameDialog> {
               children: [
                 // App icon with glow
                 Container(
-                      padding: const EdgeInsets.all(28),
+                      width: 96,
+                      height: 96,
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            AppColors.primaryLight.withValues(alpha: 0.2),
-                            AppColors.accent.withValues(alpha: 0.1),
-                          ],
-                        ),
-                        shape: BoxShape.circle,
+                        borderRadius: BorderRadius.circular(24),
                         boxShadow: [
                           BoxShadow(
                             color: AppColors.primaryLight.withValues(
-                              alpha: 0.2,
+                              alpha: 0.35,
                             ),
-                            blurRadius: 40,
-                            spreadRadius: 8,
+                            blurRadius: 32,
+                            spreadRadius: 4,
                           ),
                         ],
                       ),
-                      child: ShaderMask(
-                        shaderCallback: (b) =>
-                            AppColors.gradientPrimary.createShader(b),
-                        child: const Icon(
-                          Icons.share_rounded,
-                          color: Colors.white,
-                          size: 48,
+                      clipBehavior: Clip.antiAlias,
+                      child: Image.asset(
+                        'logo.jpeg',
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => ShaderMask(
+                          shaderCallback: (b) =>
+                              AppColors.gradientPrimary.createShader(b),
+                          child: const Icon(
+                            Icons.share_rounded,
+                            color: Colors.white,
+                            size: 48,
+                          ),
                         ),
                       ),
                     )
