@@ -222,7 +222,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   borderRadius: BorderRadius.circular(14),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: AppColors.primaryLight.withValues(alpha: 0.3),
+                                      color: AppColors.primaryLight.withValues(
+                                        alpha: 0.3,
+                                      ),
                                       blurRadius: 16,
                                       offset: const Offset(0, 4),
                                     ),
@@ -264,8 +266,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                             vertical: 2,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: AppColors.primaryLight.withValues(alpha: 0.15),
-                                            borderRadius: BorderRadius.circular(6),
+                                            color: AppColors.primaryLight
+                                                .withValues(alpha: 0.15),
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
                                           ),
                                           child: Text(
                                             state.appBadgeVersion,
@@ -278,9 +283,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                         ),
                                         const SizedBox(width: 8),
                                         Text(
-                                          state.isOnline ? 'Network Active' : 'Offline',
+                                          state.isOnline
+                                              ? 'Network Active'
+                                              : 'Offline',
                                           style: TextStyle(
-                                            color: state.isOnline ? AppColors.success : AppColors.error,
+                                            color: state.isOnline
+                                                ? AppColors.success
+                                                : AppColors.error,
                                             fontSize: 11,
                                             fontWeight: FontWeight.w500,
                                           ),
@@ -352,7 +361,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         children: [
                           _faqTile(
                             icon: Icons.wifi_off_rounded,
-                            question: 'Does ClipLAN require an Internet connection?',
+                            question:
+                                'Does ClipLAN require an Internet connection?',
                             answer:
                                 'No! ClipLAN works 100% offline over your local Wi-Fi router or personal hotspot. No external data is consumed, and your files never touch the cloud.',
                           ),
@@ -514,9 +524,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String answer,
   }) {
     return Theme(
-      data: Theme.of(context).copyWith(
-        dividerColor: Colors.transparent,
-      ),
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: ExpansionTile(
         tilePadding: EdgeInsets.zero,
         childrenPadding: const EdgeInsets.only(top: 4, bottom: 8, left: 36),
