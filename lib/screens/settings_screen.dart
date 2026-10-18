@@ -206,59 +206,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                     const SizedBox(height: 24),
 
-                    // ── FAQ ──────────────────────────────────────────────────
-                    _section('Frequently Asked Questions'),
-                    const SizedBox(height: 12),
-                    GlassmorphicCard(
-                      child: Column(
-                        children: [
-                          _faqTile(
-                            icon: Icons.wifi_off_rounded,
-                            question: 'Does ClipLAN require an Internet connection?',
-                            answer:
-                                'No! ClipLAN works 100% offline over your local Wi-Fi router or personal hotspot. No external data is consumed, and your files never touch the cloud.',
-                          ),
-                          const Divider(color: AppColors.divider, height: 16),
-                          _faqTile(
-                            icon: Icons.devices_rounded,
-                            question: 'Why is a nearby device not showing up?',
-                            answer:
-                                'Make sure both devices are connected to the exact same Wi-Fi network and that local network permissions are allowed. If your router has "AP Isolation" or "Guest Mode" enabled, devices cannot see each other. You can also connect directly by scanning a QR Code.',
-                          ),
-                          const Divider(color: AppColors.divider, height: 16),
-                          _faqTile(
-                            icon: Icons.folder_open_rounded,
-                            question: 'Where are received files stored?',
-                            answer:
-                                'Files are automatically saved to your system directory (such as Downloads/ClipLAN or Documents/ClipLAN). You can change the destination anytime in the Storage section above.',
-                          ),
-                          const Divider(color: AppColors.divider, height: 16),
-                          _faqTile(
-                            icon: Icons.speed_rounded,
-                            question: 'How fast are the file transfers?',
-                            answer:
-                                'ClipLAN streams data directly over high-speed local TCP sockets with adaptive buffer sizes up to 8MB. Transfer speeds utilize your full Wi-Fi bandwidth, frequently reaching 50–100+ MB/s.',
-                          ),
-                          const Divider(color: AppColors.divider, height: 16),
-                          _faqTile(
-                            icon: Icons.content_paste_rounded,
-                            question: 'How does Clipboard Sync work?',
-                            answer:
-                                'When you copy text or links on one device, you can sync it instantly to other devices on your local network without manual re-typing.',
-                          ),
-                          const Divider(color: AppColors.divider, height: 16),
-                          _faqTile(
-                            icon: Icons.shield_rounded,
-                            question: 'Are my transfers private and secure?',
-                            answer:
-                                'All transfers are completely peer-to-peer and never leave your local network. Every transfer is validated with end-to-end SHA-256 cryptographic checksums to guarantee file integrity.',
-                          ),
-                        ],
-                      ),
-                    ).animate().fadeIn(delay: 350.ms).slideY(begin: 0.1),
-
-                    const SizedBox(height: 24),
-
                     // ── About ────────────────────────────────────────────────
                     _section('About'),
                     const SizedBox(height: 12),
@@ -342,7 +289,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                         ],
                       ),
-                    ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.1),
+                    ).animate().fadeIn(delay: 350.ms).slideY(begin: 0.1),
 
                     const SizedBox(height: 12),
                     GlassmorphicCard(
@@ -364,6 +311,59 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             Icons.security_rounded,
                             'Verification',
                             'SHA-256',
+                          ),
+                        ],
+                      ),
+                    ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.1),
+
+                    const SizedBox(height: 24),
+
+                    // ── FAQ ──────────────────────────────────────────────────
+                    _section('Frequently Asked Questions'),
+                    const SizedBox(height: 12),
+                    GlassmorphicCard(
+                      child: Column(
+                        children: [
+                          _faqTile(
+                            icon: Icons.wifi_off_rounded,
+                            question: 'Does ClipLAN require an Internet connection?',
+                            answer:
+                                'No! ClipLAN works 100% offline over your local Wi-Fi router or personal hotspot. No external data is consumed, and your files never touch the cloud.',
+                          ),
+                          const Divider(color: AppColors.divider, height: 16),
+                          _faqTile(
+                            icon: Icons.devices_rounded,
+                            question: 'Why is a nearby device not showing up?',
+                            answer:
+                                'Make sure both devices are connected to the exact same Wi-Fi network and that local network permissions are allowed. If your router has "AP Isolation" or "Guest Mode" enabled, devices cannot see each other. You can also connect directly by scanning a QR Code.',
+                          ),
+                          const Divider(color: AppColors.divider, height: 16),
+                          _faqTile(
+                            icon: Icons.folder_open_rounded,
+                            question: 'Where are received files stored?',
+                            answer:
+                                'Files are automatically saved to your system directory (such as Downloads/ClipLAN or Documents/ClipLAN). You can change the destination anytime in the Storage section above.',
+                          ),
+                          const Divider(color: AppColors.divider, height: 16),
+                          _faqTile(
+                            icon: Icons.speed_rounded,
+                            question: 'How fast are the file transfers?',
+                            answer:
+                                'ClipLAN streams data directly over high-speed local TCP sockets with adaptive buffer sizes up to 8MB. Transfer speeds utilize your full Wi-Fi bandwidth, frequently reaching 50–100+ MB/s.',
+                          ),
+                          const Divider(color: AppColors.divider, height: 16),
+                          _faqTile(
+                            icon: Icons.content_paste_rounded,
+                            question: 'How does Clipboard Sync work?',
+                            answer:
+                                'When you copy text or links on one device, you can sync it instantly to other devices on your local network without manual re-typing.',
+                          ),
+                          const Divider(color: AppColors.divider, height: 16),
+                          _faqTile(
+                            icon: Icons.shield_rounded,
+                            question: 'Are my transfers private and secure?',
+                            answer:
+                                'All transfers are completely peer-to-peer and never leave your local network. Every transfer is validated with end-to-end SHA-256 cryptographic checksums to guarantee file integrity.',
                           ),
                         ],
                       ),
