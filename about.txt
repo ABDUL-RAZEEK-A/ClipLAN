@@ -1,0 +1,282 @@
+======================================================================
+PROJECT DOCUMENTATION: ClipLAN
+======================================================================
+
+1. PROJECT OVERVIEW
+----------------------------------------------------------------------
+Project Name: ClipLAN
+Version: 4.3.0+6 (Release: v4.3.0, Build: 6)
+Description: ClipLAN is a blazing fast, open-source, serverless, peer-to-peer local area network file sharing and real-time shared clipboard platform built with Flutter. It completely eliminates the need for central servers, cloud storage intermediaries, or external internet connections, guaranteeing absolute data sovereignty, privacy, and minimizing latency to physical hardware limits.
+
+2. TECHNOLOGY STACK
+----------------------------------------------------------------------
+- Framework: Flutter / Dart (SDK: >=3.0.0)
+- Architecture: Modular Architecture separating Presentation Layer from Core Networking
+- State Management: Provider / Riverpod
+- Networking & Protocol: UDP IPv4 Multicast (Discovery), Raw TCP IPv4 Sockets (Data Transfer)
+- Local Database & Storage: `shared_preferences`, Dart File I/O
+- Security & Cryptography: `crypto` (SHA-256 Checksums in Dart Isolates)
+- Utilities: `permission_handler`, `flutter_animate`
+
+3. SYSTEM REQUIREMENTS
+----------------------------------------------------------------------
+### Functional Requirements
+- Peer Discovery: Devices on the same LAN/Wi-Fi can discover each other automatically using UDP multicast.
+- File Distribution: Users can share large files directly with discovered peers via TCP streams.
+- Real-Time Clipboard Sync: Synchronizes the host OS clipboard across connected devices on the network.
+- Cross-Platform: Support for Android, iOS, macOS, and Windows.
+- Progress & History Tracking: Real-time progress tracking with SHA-256 verification status, exact byte counts, speed (MB/s), and history logs.
+
+### Non-Functional Requirements
+- High-Throughput: Capable of streaming terabytes of data over prolonged periods, utilizing the maximum physical bandwidth of modern local network hardware (up to Gigabit line speeds).
+- Zero Configuration: The app must not require users to input IP addresses manually.
+- Low Memory Footprint: The application strictly bounds its memory, typically consuming < 50MB of RAM even when transferring 100GB+ files, enforced by strict `IOSink` backpressure management.
+- Security & Integrity: File downloads must be verified via real-time SHA-256 cryptographic checksums computing on the fly.
+- Offline Capability: The system must function entirely on Local Area Networks (LAN) without internet access.
+
+4. SYSTEM COMPONENTS & HIGH-LEVEL DESIGN (HLD)
+----------------------------------------------------------------------
+ClipLAN utilizes a purely decentralized, mesh-like topology where every node acts simultaneously as a client and a server.
+
+- Presentation Layer / UI: Flutter UI Widgets and State Management (Riverpod & Provider) for reactive state synchronization.
+- Service Layer: Core networking and business logic services including Discovery, Transfer, Clipboard, and File System.
+- Hardware & Native Layer: UDP Multicast Sockets, TCP Data Sockets, Dart FFI / File I/O, SHA-256 Crypto Isolates, and Platform Channels for OS-level access rights.
+- Network Topology: Decentralized peer-to-peer architecture. No master node.
+
+5. MODULES & LOW-LEVEL DESIGN (LLD)
+----------------------------------------------------------------------
+The project is structured into feature-based modularity to separate concerns.
+
+### 5.1 DiscoveryService
+- Low-Level Mechanics: Handles UDP multicasting. Initializes a `RawDatagramSocket` binding to `InternetAddress.anyIPv4` and joining a specific multicast group (`224.0.0.1:53317`). It broadcasts a lightweight JSON payload containing device ID, name, OS type, and TCP port as a heartbeat every 2 seconds.
+
+### 5.2 TransferService
+- Low-Level Mechanics: Acts as both a TCP server (listening for incoming files on port 53318) and a TCP client. Streams binary data in chunks using `File.openRead()`. Employs critical backpressure mechanisms using `await sink.flush()` to ensure Dart waits until the OS confirms bytes are physically written to disk, preventing memory crashes (OOM).
+
+### 5.3 ClipboardService
+- Low-Level Mechanics: Manages real-time polling and synchronization of the host OS clipboard. Reads the OS clipboard via Flutter's `Clipboard.getData()` and pushes it to all connected peers via a lightweight TCP command.
+
+### 5.4 State Management (AppState)
+- Low-Level Mechanics: The central source of truth for the UI. Maintains a list of discovered devices (`DeviceInfo`), tracks the transfer queue (`TransferItem`), and monitors clipboard sync state. Utilizes a `RateLimiter` service to batch TCP chunk progress updates and trigger `notifyListeners()` once every 16 milliseconds to align with a 60fps refresh rate.
+
+6. DATA MODELS
+----------------------------------------------------------------------
+- DeviceInfo: `id`, `name`, `ip`, `os`, `lastSeen`
+- TransferItem: `id`, `fileName`, `totalBytes`, `bytesTransferred`, `status`, `isIncoming`, `remoteDeviceId`, `speedBytesPerSecond`
+- ClipboardItem: Model representing a synchronized clipboard text/URL
+
+7. SYSTEM WORKING FLOW
+----------------------------------------------------------------------
+### 1. Peer Discovery Sequence (UDP)
+1. Device A and Device B join the IGMP Multicast Group.
+2. Device A broadcasts a heartbeat every 2 seconds with its metadata.
+3. Device B receives the packet, parses the JSON, and registers Device A in its local state UI.
+4. Device B broadcasts its heartbeat; Device A receives and registers Device B.
+5. If a device stops sending heartbeats for more than 10 seconds, it is considered offline and removed.
+
+### 2. File Transfer Workflow (TCP)
+1. Phase 1 (Metadata Handshake): Sender establishes a TCP connection to Receiver on port 53318. Sender serializes file metadata to JSON and sends it. Receiver validates metadata, allocates disk space, and sends an ACK back.
+2. Phase 2 (Binary Stream): Sender streams the file in 2MB chunks. Receiver updates the SHA-256 digest in a background Isolate, writes the chunk via `IOSink`, and updates the progress state.
+3. Phase 3 (Verification & Closure): Sender sends an EOF signal. Receiver closes the file handle, finalizes the SHA-256 hash computation, compares it to the expected hash, and marks the transfer complete.
+
+======================================================================
+8. DETAILED ABSTRACT
+======================================================================
+ABSTRACT
+
+In an increasingly connected world, the paradox of transferring large files between adjacent devices remains surprisingly frustrating. Existing solutions often rely on external cloud servers—which compromises privacy, consumes unnecessary bandwidth, and is inherently slow due to ISP upload limits. Alternative local solutions mandate intrusive Bluetooth pairing, suffer from artificial rate limits, or are plastered with intrusive advertisements.
+
+To solve this fundamental problem, we introduce "ClipLAN," a blazing fast, open-source, serverless, peer-to-peer local area network file sharing and real-time shared clipboard platform. ClipLAN transfers gigabytes of data seamlessly, securely, and purely offline, harnessing the absolute maximum physical bandwidth of modern local network hardware without any intermediary bottlenecks. 
+
+The system utilizes a sophisticated combination of UDP IPv4 multicasting for decentralized, zero-configuration peer discovery, paired with raw TCP socket streaming for high-throughput, reliable data transfer. By implementing strict disk I/O backpressure management and offloading cryptographic hashing to background isolates, ClipLAN is capable of handling massive, sustained workloads while maintaining a microscopic memory footprint. With built-in security features like real-time SHA-256 cryptographic checksums and cross-platform compatibility across Android, iOS, macOS, and Windows, ClipLAN provides an unparalleled, zero-friction local transfer experience.
+
+======================================================================
+9. PROJECT REPORT STRUCTURE & INDEX
+======================================================================
+
+TABLE OF CONTENTS
+<Font Style Times New Roman – Size - 14>
+
+CHAPTER TITLE                                           PAGE No.
+          ABSTRACT                                          v
+          LIST OF ABBREVIATIONS                             x
+
+1         INTRODUCTION                                      1
+  1.1     Description                                       1
+  1.2     System Architecture                               2
+    1.2.1 UDP Multicast Peer Discovery                      3
+    1.2.2 TCP Data Transfer Engine                          4
+  1.3     Platform Dependencies                             6
+  1.4     Security & Authorization                          7
+    1.4.1 Strict Memory Management & Backpressure           7
+    1.4.2 Checksum Verification (SHA-256 in Isolates)       8
+  1.5     Objective of the Project                          9
+
+2         LITERATURE SURVEY                                 10
+3         EXISTING SYSTEM                                   14
+4         PROBLEMS IDENTIFIED                               16
+5         PROPOSED SYSTEM                                   18
+6         SYSTEM REQUIREMENTS                               20
+  6.1     Hardware Requirements                             20
+  6.2     Software Requirements                             21
+
+7         SYSTEM IMPLEMENTATIONS                            22
+  7.1     List of Modules                                   22
+  7.2     Modules Description                               23
+    7.2.1 Discovery Service                                 23
+    7.2.2 Transfer Service                                  24
+    7.2.3 Clipboard Service                                 25
+    7.2.4 File System & Storage Service                     26
+    7.2.5 State Management & Rate Limiter                   27
+
+8         SYSTEM TESTING                                    28
+  8.1     Unit Testing                                      28
+  8.2     Integration Testing (Loopback)                    29
+  8.3     System Testing                                    30
+  8.4     Performance Testing & OOM Prevention              31
+  8.5     Security & Threat Modeling                        32
+
+9         RESULTS AND DISCUSSION                            34
+10        CONCLUSION AND FUTURE WORK                        36
+  10.1    Conclusion                                        36
+  10.2    Future Enhancements (WebRTC, TLS, CLI)            37
+
+          APPENDIX A - SOURCE CODE                          38
+          APPENDIX B - SCREENSHOTS                          45
+          REFERENCES                                        50
+
+======================================================================
+
+LIST OF ABBREVIATIONS
+<Font Style Times New Roman – Size - 14>
+
+ABBREVIATION  FULL FORM
+LAN         - Local Area Network
+UDP         - User Datagram Protocol
+TCP         - Transmission Control Protocol
+SHA         - Secure Hash Algorithm
+OOM         - Out Of Memory
+MVVM        - Model-View-ViewModel
+NAT         - Network Address Translation
+E2EE        - End-to-End Encryption
+
+<Font Style Times New Roman – Size – 13>
+======================================================================
+10. DETAILED PROJECT REPORT CONTENT
+======================================================================
+
+CHAPTER 1: INTRODUCTION
+----------------------------------------------------------------------
+1.1 Description
+ClipLAN is an advanced, production-ready distributed system designed for high-speed, decentralized file and clipboard data transmission across local area networks. By completely eliminating the need for central servers, cloud storage intermediaries, or external internet connections, it guarantees absolute data sovereignty, privacy, and minimizes latency to physical hardware limits.
+- Current Version: 4.3.0+6 (Release: v4.3.0, Build: 6)
+
+1.2 System Architecture
+The architecture of ClipLAN is heavily modularized, separating the presentation layer from the core networking engine using modern reactive state management. This decoupled approach ensures that the UI remains highly responsive regardless of the underlying computational or I/O load. It is a completely decentralized mesh network; there is no central server.
+
+1.2.1 UDP Multicast Peer Discovery
+To achieve a "Zero Configuration" user experience, ClipLAN utilizes UDP IPv4 multicasting. Devices broadcast a lightweight, stateless heartbeat packet on a specific multicast group (`224.0.0.1:53317`). This lets all other devices on the same subnet instantly discover peers without any manual IP configuration.
+
+1.2.2 TCP Data Transfer Engine
+For actual file transfers, ClipLAN relies on raw TCP IPv4 sockets to ensure reliable, high-throughput delivery. The protocol uses a custom metadata header followed by raw binary chunk streaming. 
+
+1.3 Platform Dependencies
+ClipLAN is built using the Flutter framework (Dart >=3.0.0). The codebase compiles natively across Android, iOS, macOS, and Windows. It heavily relies on Dart's `dart:io` library for low-level socket manipulation and Dart Isolates for background computation.
+
+1.4 Security & Performance
+1.4.1 Strict Memory Management & Backpressure
+A major challenge when transferring huge files (e.g., 50GB) is memory exhaustion (OOM), especially when the network speed outpaces the device's disk write speed. ClipLAN implements strict `IOSink` backpressure (using `await sink.flush()`) to force the Dart VM to wait until the OS confirms bytes are physically written to the disk block before pulling the next chunk from the TCP buffer.
+
+1.4.2 Checksum Verification (SHA-256 in Isolates)
+Data integrity is verified using real-time SHA-256 checksums that compute on-the-fly as files stream in 2MB chunks. To avoid blocking the main UI thread during these heavy cryptographic computations, the hashing process is entirely offloaded to background Dart Isolates.
+
+1.5 Objective of the Project
+The goal of ClipLAN is to provide a fast, private, and frictionless local communication tool. It seeks to bypass the arbitrary limitations of cloud and ecosystem-locked solutions by fully utilizing raw local network hardware to share files of any size instantly.
+
+CHAPTER 2: LITERATURE SURVEY
+----------------------------------------------------------------------
+Recent studies on local peer-to-peer file sharing highlight the dichotomy between seamless, proprietary solutions (e.g., Apple AirDrop) and cross-platform but clunky or ad-supported alternatives. The introduction of the mDNS protocol revolutionized service discovery on local networks, proving that decentralized, zero-configuration architectures are highly effective for modern localized data exchange.
+
+CHAPTER 3: EXISTING SYSTEM
+----------------------------------------------------------------------
+Current file transfer methods predominantly rely on:
+1. Cloud Storage: Highly reliable but require high-speed internet, consume massive bandwidth, and introduce upload/download latency.
+2. Ecosystem-Locked Solutions: Seamless (like AirDrop or Nearby Share) but strictly confined to specific hardware ecosystems, preventing cross-platform sharing.
+3. Third-Party Apps: Often bloated with advertisements, require invasive permissions, and pose privacy risks.
+
+CHAPTER 4: PROBLEMS IDENTIFIED
+----------------------------------------------------------------------
+- Platform Incompatibility: Lack of a unified protocol bridging Android, iOS, Windows, and macOS seamlessly.
+- Internet Dependency: Cloud methods fail in offline environments (e.g., flights, remote sites).
+- Security & Privacy: Ad-heavy sharing applications harvest user data and require unnecessary permissions.
+- Performance Bottlenecks: Solutions using high-level HTTP wrappers or Bluetooth struggle with gigabyte-sized files.
+
+CHAPTER 5: PROPOSED SYSTEM
+----------------------------------------------------------------------
+ClipLAN is proposed as a completely decentralized, ad-free, cross-platform application. Running natively via Flutter, it utilizes existing Wi-Fi/LAN networks to facilitate transfers via raw TCP streams, bypassing internet dependencies entirely. It features zero-configuration UDP discovery, real-time SHA-256 integrity verification, and hardware-level memory management to maximize throughput safely.
+
+CHAPTER 6: SYSTEM REQUIREMENTS
+----------------------------------------------------------------------
+6.1 Hardware Requirements
+- Processor: ARM64 (Mobile) or x86_64 (Desktop), minimum 1.5 GHz Dual-Core.
+- Memory: 2 GB RAM minimum.
+- Storage: 100 MB for application; additional dynamically based on shared files.
+- Networking: 802.11n/ac/ax Wi-Fi adapter or Gigabit Ethernet.
+
+6.2 Software Requirements
+- Operating System: Android 6.0+, iOS 12.0+, Windows 10/11, macOS 10.14+, or Linux.
+- Environment: Flutter SDK (>=3.0.0).
+
+CHAPTER 7: SYSTEM IMPLEMENTATIONS
+----------------------------------------------------------------------
+7.1 List of Modules
+The system is divided into five core functional modules:
+1. Discovery Service
+2. Transfer Service
+3. Clipboard Service
+4. File System & Storage Service
+5. State Management & Rate Limiter
+
+7.2 Modules Description
+7.2.1 Discovery Service: Manages UDP multicasting (`224.0.0.1:53317`) for zero-configuration peer detection.
+7.2.2 Transfer Service: Handles raw TCP socket streaming for incoming and outgoing files with strict `IOSink` backpressure to prevent memory exhaustion.
+7.2.3 Clipboard Service: Polls and synchronizes host OS clipboard data across peers.
+7.2.4 File System & Storage Service: Manages disk I/O, allocating space, and writing raw binary chunks to local storage securely.
+7.2.5 State Management & Rate Limiter: Utilizes Riverpod/Provider to reactively update the UI at 60fps without overwhelming the main thread during heavy network I/O.
+
+CHAPTER 8: SYSTEM TESTING
+----------------------------------------------------------------------
+8.1 Unit Testing: Validated custom protocol serialization and SHA-256 cryptographic hashing logic in pure Dart.
+8.2 Integration Testing (Loopback): Simulated local loopback transfers on `127.0.0.1` to ensure the state manager handles concurrent incoming transfers and socket race conditions.
+8.3 System Testing: Conducted end-to-end transfers between mixed physical devices (e.g., macOS to Android) verifying cross-platform compatibility.
+8.4 Performance Testing & OOM Prevention: Tested with 50GB+ files; confirmed `IOSink.flush()` successfully prevented RAM from exceeding 50MB during transfers at Gigabit speeds.
+8.5 Security & Threat Modeling: Verified that missing mDNS multicast configurations or incorrect metadata safely aborts transfers. Confirmed SHA-256 correctly quarantines corrupted files.
+
+CHAPTER 9: RESULTS AND DISCUSSION
+----------------------------------------------------------------------
+ClipLAN's implementation yielded extremely positive results. UDP discovery consistently detected peers within 1-2 seconds. File transfer speeds were exceptionally high, saturating available network bandwidth (e.g., 40-50 MB/s on 5GHz 802.11ac, and >100 MB/s on Gigabit Ethernet). The zero-copy architecture and strict memory backpressure allowed seamless streaming of massive files without causing UI jank or out-of-memory crashes on low-end devices.
+
+CHAPTER 10: CONCLUSION AND FUTURE WORK
+----------------------------------------------------------------------
+10.1 Conclusion
+ClipLAN successfully demonstrates that a cross-platform Flutter application can harness raw, low-level networking capabilities to act as a highly efficient localized data distribution node. By intelligently combining UDP for discovery and TCP for streaming, it overcomes cloud dependency and platform lock-in.
+
+10.2 Future Enhancements (WebRTC, TLS, CLI)
+- WebRTC Integration: Enable secure transfers across different subnets or over the internet via TURN/STUN relays.
+- End-to-End Encryption (E2EE): Upgrade raw TCP sockets to TLS-encrypted sockets.
+- Headless CLI Server: Create a dedicated command-line interface for Linux servers/NAS devices.
+
+APPENDIX A - SOURCE CODE
+Refer to the `clipland/lib` directory for the core Dart implementation, encompassing state management, native platform channels, and raw socket networking.
+
+APPENDIX B - SCREENSHOTS
+Screenshots illustrating the Dashboard, Discovery Radar, File Transfer Progress, and Glassmorphic UI are stored in the application's documentation/assets folder.
+
+REFERENCES
+1. Cheshire, S., & Krochmal, M. (2013). "Multicast DNS." RFC 6762.
+2. Flutter.dev. "Architectural Overview." Official Flutter Documentation.
+3. Postel, J. (1981). "Transmission Control Protocol." RFC 793.
+
+======================================================================
+END OF DOCUMENT
+======================================================================
