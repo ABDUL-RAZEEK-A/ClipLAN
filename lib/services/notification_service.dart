@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -38,9 +39,9 @@ class NotificationService {
 
     const DarwinInitializationSettings initializationSettingsDarwin =
         DarwinInitializationSettings(
-      requestSoundPermission: false,
-      requestBadgePermission: false,
-      requestAlertPermission: false,
+      requestSoundPermission: true,
+      requestBadgePermission: true,
+      requestAlertPermission: true,
     );
 
     const InitializationSettings initializationSettings = InitializationSettings(
@@ -58,6 +59,26 @@ class NotificationService {
         }
       },
     );
+
+    if (Platform.isMacOS) {
+      await _flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              MacOSFlutterLocalNotificationsPlugin>()
+          ?.requestPermissions(
+            alert: true,
+            badge: true,
+            sound: true,
+          );
+    } else if (Platform.isIOS) {
+      await _flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              IOSFlutterLocalNotificationsPlugin>()
+          ?.requestPermissions(
+            alert: true,
+            badge: true,
+            sound: true,
+          );
+    }
 
     _initialized = true;
   }
@@ -95,8 +116,18 @@ class NotificationService {
       ],
     );
 
+    final DarwinNotificationDetails darwinPlatformSpecifics =
+        DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: false,
+      subtitle: '$progress%',
+    );
+
     final NotificationDetails platformChannelSpecifics = NotificationDetails(
       android: androidPlatformChannelSpecifics,
+      macOS: darwinPlatformSpecifics,
+      iOS: darwinPlatformSpecifics,
     );
 
     await _flutterLocalNotificationsPlugin.show(
@@ -123,8 +154,17 @@ class NotificationService {
       autoCancel: true,
     );
 
+    const DarwinNotificationDetails darwinPlatformSpecifics =
+        DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+
     const NotificationDetails platformChannelSpecifics = NotificationDetails(
       android: androidPlatformChannelSpecifics,
+      macOS: darwinPlatformSpecifics,
+      iOS: darwinPlatformSpecifics,
     );
 
     await _flutterLocalNotificationsPlugin.show(
