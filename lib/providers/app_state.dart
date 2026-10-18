@@ -311,6 +311,11 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
         notifyListeners();
       });
 
+      discovery.ipStream.listen((ip) {
+        debugPrint('[ClipLAN] Discovery IP updated: $ip');
+        notifyListeners();
+      });
+
       discovery.clipboardStream.listen((data) {
         _handleClipboardData(data);
       });

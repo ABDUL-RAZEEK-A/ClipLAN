@@ -13,6 +13,10 @@ void main() async {
   runZonedGuarded(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
+      
+      // Restrict Flutter image cache to keep memory footprint lean
+      PaintingBinding.instance.imageCache.maximumSize = 50;
+      PaintingBinding.instance.imageCache.maximumSizeBytes = 20 * 1024 * 1024; // 20 MB max
 
       FlutterError.onError = (details) {
         debugPrint('[ClipLAN] Flutter error: ${details.exception}');

@@ -18,9 +18,9 @@ final int _optimalBufferSize = _calculateOptimalBufferSize();
 int getOptimalBufferSize() => _optimalBufferSize;
 
 int _calculateOptimalBufferSize() {
-  return 128 *
+  return 32 *
       1024 *
-      1024; // 128MB buffer prevents TCP Window Collapse on fast Wi-Fi
+      1024; // 32MB buffer prevents TCP Window Collapse while keeping RAM lean
 }
 
 // ---------------------------------------------------------

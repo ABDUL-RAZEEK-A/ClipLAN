@@ -81,6 +81,7 @@ class DiscoveryService {
 
   final StreamController<List<DeviceInfo>> _devicesController = StreamController<List<DeviceInfo>>.broadcast();
   final StreamController<Map<String, dynamic>> _clipboardController = StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<String> _ipController = StreamController<String>.broadcast();
 
   String _deviceName;
   String _username;
@@ -97,6 +98,7 @@ class DiscoveryService {
   ReceivePort? _receivePort;
 
   String? get localIp => _localIp;
+  Stream<String> get ipStream => _ipController.stream;
   Stream<List<DeviceInfo>> get devicesStream => _devicesController.stream;
   Stream<Map<String, dynamic>> get clipboardStream => _clipboardController.stream;
   List<DeviceInfo> get devices => _devices;
@@ -128,6 +130,32 @@ class DiscoveryService {
   Future<void> start() async {
     if (_isolate != null) return;
     
+    // Fast initial check on main thread so localIp is available immediately
+    NetworkInterface.list(type: InternetAddressType.IPv4, includeLinkLocal: false).then((interfaces) {
+      for (final iface in interfaces) {
+        final name = iface.name.toLowerCase();
+        if (name.contains('vethernet') || name.contains('virtual') || name.contains('wsl') ||
+            name.contains('vbox') || name.contains('vmware') || name.contains('hyper-v') ||
+            name.contains('docker') || name.contains('vpn') || name.contains('loopback')) {
+          continue;
+        }
+        for (final addr in iface.addresses) {
+          if (!addr.isLoopback && addr.type == InternetAddressType.IPv4) {
+            final ip = addr.address;
+            if (ip != '127.0.0.1' && ip != '0.0.0.0' && !ip.startsWith('169.254.')) {
+              if (_localIp == null) {
+                _localIp = ip;
+                if (!_ipController.isClosed) {
+                  _ipController.add(ip);
+                }
+              }
+              return;
+            }
+          }
+        }
+      }
+    }).catchError((_) {});
+
     _receivePort?.close();
     _receivePort = ReceivePort();
     
@@ -141,6 +169,9 @@ class DiscoveryService {
         _clipboardController.add(message.data);
       } else if (message is LocalIpUpdateMessage) {
         _localIp = message.ip;
+        if (_localIp != null && !_ipController.isClosed) {
+          _ipController.add(_localIp!);
+        }
       } else if (message is LogMessage) {
         debugPrint(message.message);
       }
@@ -189,6 +220,7 @@ class DiscoveryService {
     stop();
     _devicesController.close();
     _clipboardController.close();
+    _ipController.close();
   }
 }
 
@@ -330,7 +362,7 @@ Future<void> _discoveryIsolateEntryPoint(_IsolateConfig config) async {
         }
       }
 
-      if (ips.isEmpty && config.isIOS) {
+      if (ips.isEmpty) {
         final fallbackIp = await getLocalIpViaSocket();
         if (fallbackIp != null) {
           ips.add(fallbackIp);
@@ -343,6 +375,8 @@ Future<void> _discoveryIsolateEntryPoint(_IsolateConfig config) async {
         final newIp = bestIp ?? ips.first;
         if (localIp != newIp) {
           localIp = newIp;
+          config.sendPort.send(LocalIpUpdateMessage(localIp));
+        } else if (localIp != null) {
           config.sendPort.send(LocalIpUpdateMessage(localIp));
         }
       }
