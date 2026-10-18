@@ -9,6 +9,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../models/device_info.dart';
 import '../models/transfer_item.dart';
+import 'media_scanner_service.dart';
 
 typedef TransferApprovalCallback = Future<bool> Function(TransferItem transfer);
 typedef TransferUpdateCallback = void Function(TransferItem transfer);
@@ -750,6 +751,8 @@ class TransferService {
               transfer.files[fileIndex].path = filePath;
               transfer.currentFileIndex = fileIndex + 1;
               onTransferUpdate?.call(transfer);
+              // Instantly index file into Gallery and Files
+              MediaScannerService.scanFile(filePath);
             }
           }
         } else if (type == 'transfer_completed') {
@@ -763,6 +766,16 @@ class TransferService {
             onTransferUpdate?.call(transfer);
             _activeTransfers.remove(id);
             _checkWakelock();
+
+            // Batch scan all received files into Gallery and Files
+            if (transfer.direction == TransferDirection.receiving) {
+              final paths = transfer.files
+                  .map((f) => f.path)
+                  .whereType<String>()
+                  .where((p) => p.isNotEmpty)
+                  .toList();
+              MediaScannerService.scanFiles(paths);
+            }
           }
         } else if (type == 'transfer_failed') {
           final id = msg['transferId'];

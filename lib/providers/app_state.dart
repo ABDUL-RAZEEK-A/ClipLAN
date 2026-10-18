@@ -20,6 +20,7 @@ import '../services/discovery_service.dart';
 import '../services/transfer_service.dart';
 import '../services/storage_service.dart';
 import '../services/app_version_service.dart';
+import '../services/media_scanner_service.dart';
 import '../theme/app_theme.dart';
 
 /// Central application state — manages discovery, transfers, history, clipboard, and settings.
@@ -492,6 +493,18 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       
       // Clear progress notification and show completion
       NotificationService().cancelNotification(888);
+
+      if (transfer.status == TransferStatus.completed &&
+          transfer.direction == TransferDirection.receiving) {
+        final paths = transfer.files
+            .map((f) => f.path)
+            .whereType<String>()
+            .where((p) => p.isNotEmpty)
+            .toList();
+        if (paths.isNotEmpty) {
+          MediaScannerService.scanFiles(paths);
+        }
+      }
       
       if (!_isInForeground) {
         if (transfer.status == TransferStatus.completed) {
