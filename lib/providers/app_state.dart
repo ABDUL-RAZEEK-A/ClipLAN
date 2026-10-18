@@ -19,6 +19,7 @@ import '../models/clipboard_item.dart';
 import '../services/discovery_service.dart';
 import '../services/transfer_service.dart';
 import '../services/storage_service.dart';
+import '../services/app_version_service.dart';
 import '../theme/app_theme.dart';
 
 /// Central application state — manages discovery, transfers, history, clipboard, and settings.
@@ -76,6 +77,11 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   bool get requireApproval => storage.requireApproval;
   double get transferSpeedLimit => _transferSpeedLimitMbps;
   bool get showDeviceIp => storage.showDeviceIp;
+  String get appVersion => AppVersionService.version;
+  String get appBuildNumber => AppVersionService.buildNumber;
+  String get appBadgeVersion => AppVersionService.badgeVersion;
+  String get appDisplayVersion => AppVersionService.displayVersion;
+  String get appFullVersion => AppVersionService.fullVersion;
 
   /// Whether the first-launch setup has been completed (device name set).
   /// Modeled after reference repo's `haveUser()`.
@@ -199,6 +205,9 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       _myClipboard = storage.getMyClipboard();
       debugPrint('[ClipLAN] History loaded: ${_history.length} items');
       debugPrint('[ClipLAN] Clipboard loaded: ${_myClipboard.length} items');
+
+      await AppVersionService.init();
+      debugPrint('[ClipLAN] App Version initialized: ${AppVersionService.fullVersion}');
 
       // Fetch Device Info if not set
       final deviceInfoPlugin = DeviceInfoPlugin();

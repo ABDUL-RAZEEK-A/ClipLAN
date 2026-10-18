@@ -8,11 +8,13 @@ import 'app.dart';
 import 'providers/app_state.dart';
 import 'services/storage_service.dart';
 import 'services/background_service.dart';
+import 'services/app_version_service.dart';
 
 void main() async {
   runZonedGuarded(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
+      await AppVersionService.init();
       
       // Restrict Flutter image cache to keep memory footprint lean
       PaintingBinding.instance.imageCache.maximumSize = 30;

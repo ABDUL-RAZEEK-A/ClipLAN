@@ -210,81 +210,95 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _section('About'),
                     const SizedBox(height: 12),
                     GlassmorphicCard(
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            width: 56,
-                            height: 56,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(14),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.primaryLight.withValues(alpha: 0.3),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            clipBehavior: Clip.antiAlias,
-                            child: Image.asset(
-                              'logo.jpeg',
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'ClipLAN',
-                                  style: TextStyle(
-                                    color: AppColors.textPrimary,
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                const Text(
-                                  'Universal Local File & Clipboard Sharing',
-                                  style: TextStyle(
-                                    color: AppColors.textTertiary,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 2,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primaryLight.withValues(alpha: 0.15),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: const Text(
-                                        'v4.3.0',
-                                        style: TextStyle(
-                                          color: AppColors.primaryLight,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      state.isOnline ? 'Network Active' : 'Offline',
-                                      style: TextStyle(
-                                        color: state.isOnline ? AppColors.success : AppColors.error,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w500,
-                                      ),
+                          Row(
+                            children: [
+                              Container(
+                                width: 56,
+                                height: 56,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(14),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.primaryLight.withValues(alpha: 0.3),
+                                      blurRadius: 16,
+                                      offset: const Offset(0, 4),
                                     ),
                                   ],
                                 ),
-                              ],
+                                clipBehavior: Clip.antiAlias,
+                                child: Image.asset(
+                                  'logo.jpeg',
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'ClipLAN',
+                                      style: TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    const Text(
+                                      'Universal Local File & Clipboard Sharing',
+                                      style: TextStyle(
+                                        color: AppColors.textTertiary,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primaryLight.withValues(alpha: 0.15),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            state.appBadgeVersion,
+                                            style: const TextStyle(
+                                              color: AppColors.primaryLight,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          state.isOnline ? 'Network Active' : 'Offline',
+                                          style: TextStyle(
+                                            color: state.isOnline ? AppColors.success : AppColors.error,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          const Text(
+                            'ClipLAN is an open-source, serverless peer-to-peer file sharing and real-time clipboard sync platform. Operating directly on your local Wi-Fi/LAN, it guarantees absolute data sovereignty, high throughput, and zero external cloud intermediaries.',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                              height: 1.45,
                             ),
                           ),
                         ],
@@ -298,7 +312,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           _infoRow(
                             Icons.info_outline_rounded,
                             'Version',
-                            '4.3.0',
+                            state.appFullVersion,
+                          ),
+                          const Divider(color: AppColors.divider, height: 24),
+                          _infoRow(
+                            Icons.tag_rounded,
+                            'Build',
+                            'Build ${state.appBuildNumber}',
                           ),
                           const Divider(color: AppColors.divider, height: 24),
                           _infoRow(
@@ -311,6 +331,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             Icons.security_rounded,
                             'Verification',
                             'SHA-256',
+                          ),
+                          const Divider(color: AppColors.divider, height: 24),
+                          _infoRow(
+                            Icons.hub_outlined,
+                            'Architecture',
+                            'Serverless P2P Mesh',
                           ),
                         ],
                       ),
