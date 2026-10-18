@@ -100,6 +100,21 @@ class TransferItem {
     return (bytesTransferred / totalSize).clamp(0.0, 1.0);
   }
 
+  int get progressPercent {
+    if (totalSize == 0) return 0;
+    return ((bytesTransferred / totalSize) * 100).clamp(0, 100).toInt();
+  }
+
+  String get formattedTransferredSize {
+    final s = bytesTransferred;
+    if (s < 1024) return '$s B';
+    if (s < 1024 * 1024) return '${(s / 1024).toStringAsFixed(1)} KB';
+    if (s < 1024 * 1024 * 1024) {
+      return '${(s / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    return '${(s / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+  }
+
   String get formattedTotalSize {
     final s = totalSize;
     if (s < 1024) return '$s B';

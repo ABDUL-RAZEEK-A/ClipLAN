@@ -69,6 +69,7 @@ class NotificationService {
     required int progress,
     required int maxProgress,
     String? payload, // Usually transfer ID
+    String? subText,
   }) async {
     final AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
@@ -83,6 +84,7 @@ class NotificationService {
       ongoing: true, // Cannot be swiped away easily
       autoCancel: false,
       onlyAlertOnce: true,
+      subText: subText ?? '$progress%',
       actions: <AndroidNotificationAction>[
         const AndroidNotificationAction(
           kCancelActionId,

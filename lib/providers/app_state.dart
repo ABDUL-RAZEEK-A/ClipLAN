@@ -108,8 +108,11 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     _isInForeground = (state == AppLifecycleState.resumed);
     
     if (state == AppLifecycleState.resumed) {
-      // Clear any lingering progress notification when re-entering app
-      NotificationService().cancelNotification(888);
+      // Clear lingering progress notification only if no active transfers
+      final hasActive = _activeTransfers.any((t) => !_isTerminal(t.status));
+      if (!hasActive) {
+        NotificationService().cancelNotification(888);
+      }
       // startServer is now guarded against redundant restarts internally
       _discovery?.start();
       _transfer?.startServer(savePath: storage.savePath);
@@ -478,8 +481,8 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
         if (transfer.status == TransferStatus.completed) {
           NotificationService().showCompletionNotification(
             id: transfer.id.hashCode,
-            title: 'Transfer Complete',
-            body: '${transfer.deviceName} - ${transfer.files.length} file(s) transferred successfully.',
+            title: 'Transfer Complete (100%)',
+            body: '${transfer.deviceName} - ${transfer.files.length} file(s) transferred successfully (${transfer.formattedTotalSize}).',
           );
         } else if (transfer.status == TransferStatus.failed) {
           NotificationService().showCompletionNotification(
@@ -505,24 +508,29 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
             _progressDirty = false;
             notifyListeners();
             
-            // Update notification
-            int progressPercent = 0;
-            if (transfer.totalSize > 0) {
-              progressPercent = ((transfer.bytesTransferred / transfer.totalSize) * 100).toInt();
-            }
-            
-            if (!_isInForeground) {
-              NotificationService().showProgressNotification(
-                id: 888, // Foreground service notification ID
-                title: transfer.direction == TransferDirection.receiving 
-                    ? 'Receiving from ${transfer.deviceName}' 
-                    : 'Sending to ${transfer.deviceName}',
-                body: 'Transferring ${transfer.files.length} file(s)...',
-                progress: progressPercent,
-                maxProgress: 100,
-                payload: transfer.id,
-              );
-            }
+            // Find active transferring item
+            final activeTransfer = _activeTransfers.firstWhere(
+              (t) => t.status == TransferStatus.transferring,
+              orElse: () => transfer,
+            );
+
+            final progressPercent = activeTransfer.progressPercent;
+            final isReceiving = activeTransfer.direction == TransferDirection.receiving;
+            final actionWord = isReceiving ? 'Receiving from' : 'Sending to';
+            final fileCount = activeTransfer.files.length;
+            final fileDetail = fileCount == 1
+                ? activeTransfer.files.first.name
+                : '$fileCount files';
+
+            NotificationService().showProgressNotification(
+              id: 888, // Foreground service notification ID
+              title: '$actionWord ${activeTransfer.deviceName} ($progressPercent%)',
+              body: '$progressPercent% • ${activeTransfer.formattedTransferredSize} of ${activeTransfer.formattedTotalSize} ($fileDetail)',
+              progress: progressPercent,
+              maxProgress: 100,
+              payload: activeTransfer.id,
+              subText: '$progressPercent%',
+            );
           } else {
             _progressThrottleTimer?.cancel();
             _progressThrottleTimer = null;

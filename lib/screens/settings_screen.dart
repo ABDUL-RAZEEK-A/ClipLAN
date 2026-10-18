@@ -210,35 +210,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _section('About'),
                     const SizedBox(height: 12),
                     GlassmorphicCard(
-                      child: Column(
-                        children: [
-                          _infoRow(
-                            Icons.info_outline_rounded,
-                            'Version',
-                            '1.0.0',
-                          ),
-                          const Divider(color: AppColors.divider, height: 24),
-                          _infoRow(
-                            Icons.wifi_rounded,
-                            'Protocol',
-                            'TCP / UDP LAN',
-                          ),
-                          const Divider(color: AppColors.divider, height: 24),
-                          _infoRow(
-                            Icons.security_rounded,
-                            'Verification',
-                            'SHA-256',
-                          ),
-                        ],
-                      ),
-                    ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.1),
-
-                    const SizedBox(height: 24),
-
-                    // ── About ──────────────────────────────────────────────
-                    _section('About'),
-                    const SizedBox(height: 12),
-                    GlassmorphicCard(
                       child: Row(
                         children: [
                           Container(
@@ -318,16 +289,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                         ],
                       ),
+                    ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.1),
+
+                    const SizedBox(height: 12),
+                    GlassmorphicCard(
+                      child: Column(
+                        children: [
+                          _infoRow(
+                            Icons.info_outline_rounded,
+                            'Version',
+                            '4.3.0',
+                          ),
+                          const Divider(color: AppColors.divider, height: 24),
+                          _infoRow(
+                            Icons.wifi_rounded,
+                            'Protocol',
+                            'TCP / UDP LAN',
+                          ),
+                          const Divider(color: AppColors.divider, height: 24),
+                          _infoRow(
+                            Icons.security_rounded,
+                            'Verification',
+                            'SHA-256',
+                          ),
+                        ],
+                      ),
                     ).animate().fadeIn(delay: 450.ms).slideY(begin: 0.1),
 
                     const SizedBox(height: 24),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16.0),
                       child: Text(
-                        'The actual transfer rate may differ from your selected speed. '
-                        'ClipLAN dynamically throttles the transfer to match your system\'s hardware capacity, '
-                        'ensuring your files transfer smoothly without crashing your device or maxing out your CPU.\n\n'
-                        'If the app becomes unstable or nearby Devices not been dispalyed or File Transfer can\'t be accessable\n, please free up your device\'s memory or restart the app to ensure a reliable connection.',
+                        'ClipLAN automatically optimizes transfer speeds and stream buffer sizes in real time based on your local network conditions and device hardware capacity, delivering ultra-fast, smooth file transfers without overloading your system.\n\n'
+                        'If nearby devices are not appearing or transfers cannot be established, ensure all devices are connected to the same Wi-Fi / Local Area Network and restart the app if needed.',
                         style: const TextStyle(
                           color: AppColors.textTertiary,
                           fontSize: 12,
