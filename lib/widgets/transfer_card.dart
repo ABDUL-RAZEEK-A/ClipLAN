@@ -52,7 +52,12 @@ class TransferCard extends StatelessWidget {
       _showError(context, 'File not found at $path');
       return;
     }
-    OpenFilex.open(path, type: file.mime);
+    if (Platform.isWindows) {
+      final winPath = path.replaceAll('/', '\\');
+      Process.run('cmd', ['/c', 'start', '""', winPath]);
+    } else {
+      OpenFilex.open(path, type: file.mime);
+    }
   }
 
   /// Show the folder containing received files.
@@ -79,7 +84,8 @@ class TransferCard extends StatelessWidget {
       // macOS: use 'open' command to reveal in Finder
       Process.run('open', [folderPath]);
     } else if (Platform.isWindows) {
-      Process.run('explorer', [folderPath]);
+      final winPath = folderPath.replaceAll('/', '\\');
+      Process.run('explorer.exe', [winPath]);
     } else if (Platform.isLinux) {
       Process.run('xdg-open', [folderPath]);
     } else {

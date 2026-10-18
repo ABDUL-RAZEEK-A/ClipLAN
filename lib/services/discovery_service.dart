@@ -247,20 +247,85 @@ Future<void> _discoveryIsolateEntryPoint(_IsolateConfig config) async {
     }
   }
 
+  bool isVirtualOrVpn(String name, String ip) {
+    final lower = name.toLowerCase();
+    if (lower.startsWith('rmnet') ||
+        lower.startsWith('ccmni') ||
+        lower.startsWith('pdp_ip') ||
+        lower.startsWith('tun') ||
+        lower.startsWith('tap') ||
+        lower.startsWith('utun') ||
+        lower.startsWith('tailscale') ||
+        lower.startsWith('wg') ||
+        lower.contains('vethernet') ||
+        lower.contains('virtual') ||
+        lower.contains('wsl') ||
+        lower.contains('vbox') ||
+        lower.contains('vmware') ||
+        lower.contains('hyper-v') ||
+        lower.contains('docker') ||
+        lower.contains('vpn') ||
+        lower.contains('loopback') ||
+        lower.contains('pseudo') ||
+        lower.contains('teredo')) {
+      return true;
+    }
+    if (ip.startsWith('169.254.') || ip.startsWith('127.')) {
+      return true;
+    }
+    return false;
+  }
+
+  bool isHighPriorityAdapter(String name) {
+    final lower = name.toLowerCase();
+    return lower.contains('wi-fi') ||
+        lower.contains('wifi') ||
+        lower.startsWith('wlan') ||
+        lower.contains('wireless') ||
+        lower.contains('ethernet') ||
+        lower.startsWith('eth') ||
+        lower.startsWith('en') ||
+        lower.contains('lan');
+  }
+
+  bool isPrivateLanIp(String ip) {
+    if (ip.startsWith('192.168.') || ip.startsWith('10.')) return true;
+    if (ip.startsWith('172.')) {
+      final parts = ip.split('.');
+      if (parts.length > 1) {
+        final second = int.tryParse(parts[1]) ?? 0;
+        if (second >= 16 && second <= 31) return true;
+      }
+    }
+    return false;
+  }
+
   Future<void> findLocalIps() async {
     try {
-      final interfaces = await NetworkInterface.list(type: InternetAddressType.IPv4, includeLinkLocal: false);
+      final interfaces = await NetworkInterface.list(
+        type: InternetAddressType.IPv4,
+        includeLinkLocal: false,
+      );
       final ips = <String>{};
-      String? wifiIp;
+      String? bestIp;
+      int bestScore = -1;
+
       for (final iface in interfaces) {
-        final name = iface.name.toLowerCase();
-        if (name.startsWith('rmnet') || name.startsWith('ccmni') || name.startsWith('pdp_ip') || name.startsWith('tun') || name.startsWith('tap') || name.startsWith('utun') || name.startsWith('tailscale') || name.startsWith('wg')) {
-          continue;
-        }
+        final name = iface.name;
         for (final addr in iface.addresses) {
-          if (!addr.isLoopback && addr.type == InternetAddressType.IPv4) {
-            ips.add(addr.address);
-            if (name.startsWith('wlan') || name.startsWith('en')) wifiIp ??= addr.address;
+          if (addr.isLoopback || addr.type != InternetAddressType.IPv4) continue;
+          final ip = addr.address;
+          if (isVirtualOrVpn(name, ip)) continue;
+
+          ips.add(ip);
+
+          int score = 0;
+          if (isHighPriorityAdapter(name)) score += 10;
+          if (isPrivateLanIp(ip)) score += 5;
+
+          if (score > bestScore) {
+            bestScore = score;
+            bestIp = ip;
           }
         }
       }
@@ -269,13 +334,13 @@ Future<void> _discoveryIsolateEntryPoint(_IsolateConfig config) async {
         final fallbackIp = await getLocalIpViaSocket();
         if (fallbackIp != null) {
           ips.add(fallbackIp);
-          wifiIp = fallbackIp;
+          bestIp = fallbackIp;
         }
       }
 
       localIps = ips;
       if (ips.isNotEmpty) {
-        final newIp = wifiIp ?? ips.first;
+        final newIp = bestIp ?? ips.first;
         if (localIp != newIp) {
           localIp = newIp;
           config.sendPort.send(LocalIpUpdateMessage(localIp));
@@ -326,6 +391,12 @@ Future<void> _discoveryIsolateEntryPoint(_IsolateConfig config) async {
           if (parts.length == 4) {
             final subnetBroadcast = '${parts[0]}.${parts[1]}.${parts[2]}.255';
             socket!.send(data, InternetAddress(subnetBroadcast), DiscoveryService.discoveryPort);
+            if (parts[0] == '172' || parts[0] == '10') {
+              try {
+                final subnetBroadcast16 = '${parts[0]}.${parts[1]}.255.255';
+                socket!.send(data, InternetAddress(subnetBroadcast16), DiscoveryService.discoveryPort);
+              } catch (_) {}
+            }
           }
         }
         for (final device in devices.values) {
@@ -418,7 +489,7 @@ Future<void> _discoveryIsolateEntryPoint(_IsolateConfig config) async {
         InternetAddress.anyIPv4,
         DiscoveryService.discoveryPort,
         reuseAddress: true,
-        reusePort: true,
+        reusePort: !config.isWindows,
       );
       socket!.broadcastEnabled = true;
       socket!.multicastLoopback = false;
