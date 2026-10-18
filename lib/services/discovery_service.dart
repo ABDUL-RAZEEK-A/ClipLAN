@@ -245,6 +245,8 @@ Future<void> _discoveryIsolateEntryPoint(_IsolateConfig config) async {
   Set<String> localIps = {};
   bool isBroadcasting = false;
   bool isRebinding = false;
+  List<int>? cachedBroadcastData;
+  String? lastCachedConfigKey;
 
   void log(String message) {
     config.sendPort.send(LogMessage(message));
@@ -395,19 +397,24 @@ Future<void> _discoveryIsolateEntryPoint(_IsolateConfig config) async {
         if (localIp == null) return;
       }
 
-      final message = jsonEncode({
-        'type': 'announce',
-        'id': config.deviceId,
-        'name': deviceName,
-        'username': username,
-        'os': config.os,
-        'hardwareName': config.hardwareName,
-        'ip': localIp ?? '',
-        'port': config.serverPort,
-        'platform': platformStr,
-      });
+      final currentConfigKey = '$deviceName|$username|$localIp|${config.serverPort}';
+      if (cachedBroadcastData == null || lastCachedConfigKey != currentConfigKey) {
+        final message = jsonEncode({
+          'type': 'announce',
+          'id': config.deviceId,
+          'name': deviceName,
+          'username': username,
+          'os': config.os,
+          'hardwareName': config.hardwareName,
+          'ip': localIp ?? '',
+          'port': config.serverPort,
+          'platform': platformStr,
+        });
+        cachedBroadcastData = utf8.encode(message);
+        lastCachedConfigKey = currentConfigKey;
+      }
 
-      final data = utf8.encode(message);
+      final data = cachedBroadcastData!;
 
       try {
         if (targetIp != null && targetIp.isNotEmpty) {
@@ -548,13 +555,13 @@ Future<void> _discoveryIsolateEntryPoint(_IsolateConfig config) async {
       );
 
       broadcastTimer?.cancel();
-      broadcastTimer = Timer.periodic(const Duration(seconds: 3), (_) => broadcast());
+      broadcastTimer = Timer.periodic(const Duration(seconds: 4), (_) => broadcast());
 
       cleanupTimer?.cancel();
-      cleanupTimer = Timer.periodic(const Duration(seconds: 3), (_) => cleanupStaleDevices());
+      cleanupTimer = Timer.periodic(const Duration(seconds: 5), (_) => cleanupStaleDevices());
 
       ipRefreshTimer?.cancel();
-      ipRefreshTimer = Timer.periodic(const Duration(seconds: 10), (_) => findLocalIps());
+      ipRefreshTimer = Timer.periodic(const Duration(seconds: 15), (_) => findLocalIps());
 
       broadcast();
       Future.delayed(const Duration(milliseconds: 200), broadcast);

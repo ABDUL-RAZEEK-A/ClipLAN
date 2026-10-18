@@ -116,7 +116,9 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       // startServer is now guarded against redundant restarts internally
       _discovery?.start();
       _transfer?.startServer(savePath: storage.savePath);
-    } else if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+    } else if (state == AppLifecycleState.paused || state == AppLifecycleState.detached || state == AppLifecycleState.hidden) {
+      PaintingBinding.instance.imageCache.clear();
+      PaintingBinding.instance.imageCache.clearLiveImages();
       _discovery?.stop();
       // Only stop server if no active transfers to prevent data loss
       if (_activeTransfers.isEmpty) {
