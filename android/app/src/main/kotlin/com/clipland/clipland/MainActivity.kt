@@ -3,9 +3,11 @@ package com.clipland.clipland
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import android.content.Context
 import android.content.pm.PackageManager
 import android.media.MediaScannerConnection
 import android.net.Uri
+import android.net.wifi.WifiManager
 import java.io.File
 
 class MainActivity : FlutterFragmentActivity() {
@@ -16,10 +18,66 @@ class MainActivity : FlutterFragmentActivity() {
     private var initialSharedPaths: List<String>? = null
     private var shareMethodChannel: MethodChannel? = null
 
+    private var multicastLock: WifiManager.MulticastLock? = null
+    private var wifiLock: WifiManager.WifiLock? = null
+
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+        acquireNetworkLocks()
         handleShareIntent(intent, isInitial = true)
         super.onCreate(savedInstanceState)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        acquireNetworkLocks()
+    }
+
+    override fun onDestroy() {
+        releaseNetworkLocks()
+        super.onDestroy()
+    }
+
+    private fun acquireNetworkLocks() {
+        try {
+            val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+            if (wifiManager != null) {
+                if (multicastLock == null || !multicastLock!!.isHeld) {
+                    multicastLock = wifiManager.createMulticastLock("ClipLAN:MulticastLock").apply {
+                        setReferenceCounted(true)
+                        acquire()
+                    }
+                }
+                if (wifiLock == null || !wifiLock!!.isHeld) {
+                    @Suppress("DEPRECATION")
+                    wifiLock = wifiManager.createWifiLock(
+                        WifiManager.WIFI_MODE_FULL_HIGH_PERF,
+                        "ClipLAN:WifiLock"
+                    ).apply {
+                        setReferenceCounted(true)
+                        acquire()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("ClipLAN_MainActivity", "Failed to acquire WiFi/Multicast locks", e)
+        }
+    }
+
+    private fun releaseNetworkLocks() {
+        try {
+            multicastLock?.let {
+                if (it.isHeld) it.release()
+            }
+            multicastLock = null
+
+            wifiLock?.let {
+                if (it.isHeld) it.release()
+            }
+            wifiLock = null
+        } catch (e: Exception) {
+            android.util.Log.e("ClipLAN_MainActivity", "Failed to release WiFi/Multicast locks", e)
+        }
     }
 
     override fun onNewIntent(intent: android.content.Intent) {

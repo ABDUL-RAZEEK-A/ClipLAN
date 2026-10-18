@@ -285,7 +285,11 @@ Future<void> _discoveryIsolateEntryPoint(_IsolateConfig config) async {
     final lower = name.toLowerCase();
     if (lower.startsWith('rmnet') ||
         lower.startsWith('ccmni') ||
-        lower.startsWith('pdp_ip') ||
+        lower.startsWith('pdp') ||
+        lower.startsWith('clat') ||
+        lower.startsWith('dummy') ||
+        lower.startsWith('radio') ||
+        lower.startsWith('wwan') ||
         lower.startsWith('tun') ||
         lower.startsWith('tap') ||
         lower.startsWith('utun') ||
@@ -315,6 +319,10 @@ Future<void> _discoveryIsolateEntryPoint(_IsolateConfig config) async {
     return lower.contains('wi-fi') ||
         lower.contains('wifi') ||
         lower.startsWith('wlan') ||
+        lower.startsWith('ap') ||
+        lower.startsWith('swlan') ||
+        lower.startsWith('softap') ||
+        lower.startsWith('p2p') ||
         lower.contains('wireless') ||
         lower.contains('ethernet') ||
         lower.startsWith('eth') ||
@@ -484,7 +492,11 @@ Future<void> _discoveryIsolateEntryPoint(_IsolateConfig config) async {
 
       if (message['type'] == 'announce') {
         final device = DeviceInfo.fromJson(message);
-        if (device.ip.isEmpty) device.ip = senderIp;
+        // Prioritize senderIp because it represents the actual physical route through which
+        // this device received the UDP datagram from the peer on this local network.
+        if (senderIp.isNotEmpty && senderIp != '127.0.0.1' && !senderIp.startsWith('169.254.')) {
+          device.ip = senderIp;
+        }
 
         final isNewDevice = !devices.containsKey(device.id);
         final existingDevice = devices[device.id];
@@ -497,7 +509,10 @@ Future<void> _discoveryIsolateEntryPoint(_IsolateConfig config) async {
           config.sendPort.send(DevicesUpdateMessage(devices.values.toList()));
         }
         if (isNewDevice) {
+          // Send unicast response multiple times with backoff to guarantee arrival even over noisy Wi-Fi
           broadcast(targetIp: senderIp);
+          Future.delayed(const Duration(milliseconds: 200), () => broadcast(targetIp: senderIp));
+          Future.delayed(const Duration(milliseconds: 500), () => broadcast(targetIp: senderIp));
         }
       } else if (message['type'] == 'clipboard') {
         final text = message['text'] as String?;

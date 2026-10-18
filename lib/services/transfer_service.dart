@@ -101,7 +101,7 @@ class ConnectionReader {
         break;
       }
       try {
-        await _dataReadyCompleter!.future;
+        await _dataReadyCompleter!.future.timeout(const Duration(seconds: 15));
         if (!_isClosed && _bufferLength < count) {
           _dataReadyCompleter = Completer<void>();
         }
@@ -174,13 +174,13 @@ class ConnectionReader {
         if (_bufferLength == 0) {
           if (_subscription?.isPaused ?? false) _subscription?.resume();
           try {
-            await _dataReadyCompleter!.future;
+            await _dataReadyCompleter!.future.timeout(const Duration(seconds: 25));
             if (!_isClosed && _bufferLength == 0) {
               _dataReadyCompleter = Completer<void>();
               continue;
             }
           } catch (e) {
-            throw Exception('Connection lost');
+            throw Exception('Connection timed out or lost');
           }
         }
 
@@ -203,7 +203,7 @@ class ConnectionReader {
 
           pendingProgress += amountRead;
           final now = DateTime.now().millisecondsSinceEpoch;
-          if (now - lastProgressTime > 100 || remaining == 0) {
+          if (now - lastProgressTime > 150 || pendingProgress >= 64 * 1024 || remaining == 0) {
             onProgress?.call(pendingProgress);
             pendingProgress = 0;
             lastProgressTime = now;
@@ -392,10 +392,23 @@ Future<void> _serverIsolateEntryPoint(ServerIsolateStartConfig config) async {
         final fileMetadata = files[fileIndex];
         final rawFileName = fileMetadata['name']?.toString() ?? 'file';
         final fileSize = fileMetadata['size'] as int;
-        final filePath = _resolveUniqueFilePath(config.savePath, rawFileName);
+
+        var effectiveSavePath = config.savePath;
+        try {
+          final testDir = Directory(effectiveSavePath);
+          if (!testDir.existsSync()) {
+            testDir.createSync(recursive: true);
+          }
+        } catch (_) {
+          effectiveSavePath = Directory.systemTemp.path;
+        }
+
+        final filePath = _resolveUniqueFilePath(effectiveSavePath, rawFileName);
         final file = File(filePath);
         if (!file.parent.existsSync()) {
-          file.parent.createSync(recursive: true);
+          try {
+            file.parent.createSync(recursive: true);
+          } catch (_) {}
         }
         final sink = file.openWrite();
 
@@ -408,8 +421,8 @@ Future<void> _serverIsolateEntryPoint(ServerIsolateStartConfig config) async {
           speedLimitMBps: senderSpeedLimitMBps,
           onProgress: (read) {
             bytesSinceUpdate += read;
-            // Send progress every 1MB to avoid DateTime sys-calls in tight loop
-            if (bytesSinceUpdate > 1024 * 1024) {
+            // Send progress update whenever >= 64KB has accumulated for fluid UI feedback
+            if (bytesSinceUpdate >= 64 * 1024) {
               config.mainSendPort.send({
                 'type': 'progress',
                 'transferId': transferId,
@@ -487,6 +500,12 @@ Future<void> _serverIsolateEntryPoint(ServerIsolateStartConfig config) async {
         'savePath': config.savePath,
       });
     } catch (e) {
+      try {
+        await _sendMessage(socket, {
+          'type': 'transfer_error',
+          'msg': e.toString(),
+        });
+      } catch (_) {}
       config.mainSendPort.send({
         'type': 'transfer_failed',
         'transferId': currentTransferId,
@@ -503,8 +522,9 @@ Future<void> _serverIsolateEntryPoint(ServerIsolateStartConfig config) async {
 // SENDER ISOLATE
 // ---------------------------------------------------------
 Future<void> _senderIsolateEntryPoint(SenderIsolateStartConfig config) async {
+  Socket? socket;
   try {
-    final socket = await Socket.connect(
+    socket = await Socket.connect(
       config.targetIp,
       config.targetPort,
       timeout: const Duration(seconds: 10),
@@ -516,7 +536,10 @@ Future<void> _senderIsolateEntryPoint(SenderIsolateStartConfig config) async {
     final reader = ConnectionReader(socket);
     final response = await reader.readMessage();
     if (response == null || response['type'] != 'transfer_accepted') {
-      throw Exception('Transfer rejected by receiver');
+      final reason = response?['type'] == 'transfer_rejected'
+          ? 'Transfer rejected by receiver'
+          : (response?['msg'] ?? 'Transfer not accepted by receiver');
+      throw Exception(reason);
     }
 
     config.mainSendPort.send({
@@ -525,7 +548,14 @@ Future<void> _senderIsolateEntryPoint(SenderIsolateStartConfig config) async {
     });
 
     for (final fileMeta in config.files) {
-      final file = File(fileMeta['path']);
+      final filePath = fileMeta['path']?.toString() ?? '';
+      if (filePath.isEmpty) {
+        throw Exception('File path is missing for ${fileMeta['name']}');
+      }
+      final file = File(filePath);
+      if (!file.existsSync()) {
+        throw Exception('File does not exist on disk: $filePath');
+      }
 
       int bytesSinceUpdate = 0;
 
@@ -573,7 +603,7 @@ Future<void> _senderIsolateEntryPoint(SenderIsolateStartConfig config) async {
 
       final stream = generateSenderStream().map((chunk) {
         bytesSinceUpdate += chunk.length;
-        if (bytesSinceUpdate > 1024 * 1024) {
+        if (bytesSinceUpdate >= 64 * 1024) {
           config.mainSendPort.send({
             'type': 'progress',
             'transferId': config.transferId,
@@ -622,11 +652,23 @@ Future<void> _senderIsolateEntryPoint(SenderIsolateStartConfig config) async {
       'checksumValid': null, // Fast mode
     });
   } catch (e) {
+    try {
+      if (socket != null) {
+        await _sendMessage(socket, {
+          'type': 'transfer_error',
+          'msg': e.toString(),
+        });
+      }
+    } catch (_) {}
     config.mainSendPort.send({
       'type': 'transfer_failed',
       'transferId': config.transferId,
       'msg': e.toString(),
     });
+  } finally {
+    try {
+      socket?.destroy();
+    } catch (_) {}
   }
 }
 
@@ -813,6 +855,23 @@ class TransferService {
     bool enableHashing = false,
     int speedLimitMBps = 0,
   }) async {
+    // Pre-validate files before initiating connection to prevent broken transfers
+    for (final f in files) {
+      if (f.path == null || f.path!.isEmpty || !File(f.path!).existsSync()) {
+        final failedTransfer = TransferItem(
+          id: transferId,
+          deviceName: device.name,
+          deviceIp: device.ip,
+          direction: TransferDirection.sending,
+          files: files,
+          status: TransferStatus.failed,
+          errorMessage: 'File not found or inaccessible: "${f.name}"',
+        );
+        onUpdate(failedTransfer);
+        return failedTransfer;
+      }
+    }
+
     final transfer = TransferItem(
       id: transferId,
       deviceName: device.name,
