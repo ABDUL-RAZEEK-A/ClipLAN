@@ -21,6 +21,7 @@ import '../services/transfer_service.dart';
 import '../services/storage_service.dart';
 import '../services/app_version_service.dart';
 import '../services/media_scanner_service.dart';
+import '../services/share_intent_service.dart';
 import '../theme/app_theme.dart';
 
 /// Central application state — manages discovery, transfers, history, clipboard, and settings.
@@ -232,7 +233,15 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       }
 
       // Initialize Share Intent (Mobile Only)
-      if (Platform.isAndroid || Platform.isIOS) {
+      if (Platform.isAndroid) {
+        ShareIntentService.init(
+          onReceived: (paths) {
+            for (final path in paths) {
+              _handleSharedFile(path);
+            }
+          },
+        );
+      } else if (Platform.isIOS) {
         ReceiveSharingIntent.instance.getMediaStream().listen(
           (List<SharedMediaFile> value) {
             for (var file in value) {
@@ -700,9 +709,12 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   List<String> get pendingSharedFiles => List.unmodifiable(_pendingSharedFiles);
 
   void _handleSharedFile(String path) {
+    if (path.isEmpty) return;
     debugPrint('[ClipLAN] Received shared file: $path');
-    _pendingSharedFiles.add(path);
-    notifyListeners();
+    if (!_pendingSharedFiles.contains(path)) {
+      _pendingSharedFiles.add(path);
+      notifyListeners();
+    }
   }
 
   void consumeSharedFiles() {
