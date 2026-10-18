@@ -84,8 +84,15 @@ class TransferCard extends StatelessWidget {
       // macOS: use 'open' command to reveal in Finder
       Process.run('open', [folderPath]);
     } else if (Platform.isWindows) {
-      final winPath = folderPath.replaceAll('/', '\\');
-      Process.run('explorer.exe', [winPath]);
+      final firstFilePath =
+          transfer.files.isNotEmpty ? transfer.files.first.path : null;
+      if (firstFilePath != null && File(firstFilePath).existsSync()) {
+        final winFilePath = firstFilePath.replaceAll('/', '\\');
+        Process.run('explorer.exe', ['/select,', winFilePath]);
+      } else {
+        final winPath = folderPath.replaceAll('/', '\\');
+        Process.run('explorer.exe', [winPath]);
+      }
     } else if (Platform.isLinux) {
       Process.run('xdg-open', [folderPath]);
     } else {

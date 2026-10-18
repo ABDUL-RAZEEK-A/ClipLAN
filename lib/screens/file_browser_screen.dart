@@ -656,6 +656,29 @@ class _InAppFileBrowserState extends State<InAppFileBrowser> {
                   ),
                   onPressed: () => setState(() => _isGridView = !_isGridView),
                 ),
+                IconButton(
+                  icon: const Icon(
+                    Icons.folder_open_rounded,
+                    color: AppColors.primaryLight,
+                  ),
+                  tooltip: 'Open in System File Explorer',
+                  onPressed: () async {
+                    try {
+                      final result = await FilePicker.pickFiles(
+                        allowMultiple: true,
+                        dialogTitle: 'Select files to share',
+                      );
+                      if (result != null && result.files.isNotEmpty) {
+                        widget.onFilesSelected(result.files);
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                        }
+                      }
+                    } catch (e) {
+                      debugPrint('[InAppBrowser] System picker error: $e');
+                    }
+                  },
+                ),
                 _buildSortMenu(),
                 if (_selectedFiles.isNotEmpty)
                   TextButton(

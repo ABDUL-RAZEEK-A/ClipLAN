@@ -147,9 +147,15 @@ class _DevicesScreenState extends State<DevicesScreen> {
 
   // ── File Browser ──────────────────────────────────────────────────────────
 
-  /// Opens the category-based file browser bottom sheet
-  /// (modeled after reference repo's Gallery/Music/Video/Files tabs).
-  void _openFileBrowser() {
+  /// Opens the file selection dialog.
+  /// On Windows, directly utilizes the native Windows folder / file system
+  /// instead of an in-app mobile bottom sheet view.
+  Future<void> _openFileBrowser() async {
+    if (Platform.isWindows) {
+      await _pickWindowsFilesOrFolder();
+      return;
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -160,6 +166,122 @@ class _DevicesScreenState extends State<DevicesScreen> {
         },
       ),
     );
+  }
+
+  /// Native Windows file and folder picker integration
+  Future<void> _pickWindowsFilesOrFolder() async {
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Row(
+          children: [
+            Icon(Icons.folder_open_rounded, color: AppColors.primaryLight),
+            SizedBox(width: 10),
+            Text(
+              'Select Files or Folder',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Open your Windows folder file system to choose individual files or select an entire folder to share.',
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.textTertiary)),
+          ),
+          OutlinedButton.icon(
+            onPressed: () => Navigator.pop(ctx, 'folder'),
+            icon: const Icon(Icons.folder_rounded, size: 18),
+            label: const Text('Select Folder'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primaryLight,
+              side: const BorderSide(color: AppColors.primaryLight),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(ctx, 'files'),
+            icon: const Icon(Icons.insert_drive_file_rounded, size: 18),
+            label: const Text('Select Files'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryLight,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (choice == 'files') {
+      try {
+        final result = await FilePicker.pickFiles(
+          allowMultiple: true,
+          dialogTitle: 'Select files to share',
+        );
+        if (result != null && result.files.isNotEmpty) {
+          setState(() => _selectedFiles = result.files);
+        }
+      } catch (e) {
+        debugPrint('[WindowsPicker] Error picking files: $e');
+      }
+    } else if (choice == 'folder') {
+      try {
+        final dirPath = await FilePicker.getDirectoryPath(
+          dialogTitle: 'Select folder to share',
+        );
+        if (dirPath != null && dirPath.isNotEmpty) {
+          final dir = Directory(dirPath);
+          if (dir.existsSync()) {
+            final entities = await dir
+                .list(recursive: true, followLinks: false)
+                .where((e) => e is File)
+                .toList();
+
+            final files = <PlatformFile>[];
+            for (final e in entities) {
+              try {
+                final f = e as File;
+                final stat = f.statSync();
+                files.add(
+                  PlatformFile(
+                    path: f.path,
+                    name: f.path.split(Platform.pathSeparator).last,
+                    size: stat.size,
+                  ),
+                );
+              } catch (_) {}
+            }
+
+            if (files.isNotEmpty) {
+              setState(() => _selectedFiles = files);
+            } else if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Selected folder is empty or contains no accessible files.'),
+                  backgroundColor: AppColors.warning,
+                ),
+              );
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('[WindowsPicker] Error picking folder: $e');
+      }
+    }
   }
 
   // ── Send/Receive Actions ──────────────────────────────────────────────────
