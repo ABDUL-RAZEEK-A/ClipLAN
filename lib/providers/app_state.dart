@@ -517,16 +517,26 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       
       if (!_isInForeground) {
         if (transfer.status == TransferStatus.completed) {
+          final isReceiving = transfer.direction == TransferDirection.receiving;
+          final title = isReceiving
+              ? 'Received 100% from ${transfer.deviceName}'
+              : 'Sent 100% to ${transfer.deviceName}';
           NotificationService().showCompletionNotification(
             id: transfer.id.hashCode,
-            title: 'Transfer Complete (100%)',
-            body: '${transfer.deviceName} - ${transfer.files.length} file(s) transferred successfully (${transfer.formattedTotalSize}).',
+            title: title,
+            body: '${transfer.files.length} file(s) transferred successfully (${transfer.formattedTotalSize}).',
           );
         } else if (transfer.status == TransferStatus.failed) {
           NotificationService().showCompletionNotification(
             id: transfer.id.hashCode,
             title: 'Transfer Failed',
             body: 'Transfer with ${transfer.deviceName} failed.',
+          );
+        } else if (transfer.status == TransferStatus.cancelled) {
+          NotificationService().showCompletionNotification(
+            id: transfer.id.hashCode,
+            title: 'Transfer Cancelled',
+            body: 'Transfer with ${transfer.deviceName} was cancelled.',
           );
         }
       }
@@ -554,15 +564,23 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
 
             final progressPercent = activeTransfer.progressPercent;
             final isReceiving = activeTransfer.direction == TransferDirection.receiving;
-            final actionWord = isReceiving ? 'Receiving from' : 'Sending to';
+            final actionWord = progressPercent >= 100
+                ? (isReceiving ? 'Received from' : 'Sent to')
+                : (isReceiving ? 'Receiving from' : 'Sending to');
             final fileCount = activeTransfer.files.length;
             final fileDetail = fileCount == 1
                 ? activeTransfer.files.first.name
                 : '$fileCount files';
 
+            final notificationTitle = progressPercent >= 100
+                ? (isReceiving
+                    ? 'Received 100% from ${activeTransfer.deviceName}'
+                    : 'Sent 100% to ${activeTransfer.deviceName}')
+                : '$actionWord ${activeTransfer.deviceName} ($progressPercent%)';
+
             NotificationService().showProgressNotification(
               id: 888, // Foreground service notification ID
-              title: '$actionWord ${activeTransfer.deviceName} ($progressPercent%)',
+              title: notificationTitle,
               body: '$progressPercent% • ${activeTransfer.formattedTransferredSize} of ${activeTransfer.formattedTotalSize} ($fileDetail)',
               progress: progressPercent,
               maxProgress: 100,

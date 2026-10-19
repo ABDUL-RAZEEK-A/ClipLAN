@@ -88,20 +88,61 @@ object UriUtils {
 
             // 3. MediaStore & General Content URIs (Standard Share Sheet from Gallery / Photos / Files)
             if (ContentResolver.SCHEME_CONTENT.equals(uri.scheme, ignoreCase = true)) {
+                // A. Direct DATA column query
                 val path = getDataColumn(context, uri, null, null)
-                if (!path.isNullOrEmpty() && File(path).exists()) {
-                    return path
-                }
+                val normDirect = normalizeToStoragePath(path)
+                if (normDirect != null) return normDirect
 
-                // Fallback: Check if file descriptor maps to a real filesystem path via Linux procfs
+                // B. Fallback: Check if file descriptor maps to a real filesystem path via Linux procfs
                 try {
                     context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
                         val fd = pfd.fd
                         val procFile = File("/proc/self/fd/$fd")
                         val target = procFile.canonicalPath
-                        if (!target.isNullOrEmpty() && !target.startsWith("/proc") && !target.startsWith("/pipe") && File(target).exists()) {
-                            return target
+                        if (!target.isNullOrEmpty() && !target.startsWith("/proc") && !target.startsWith("/pipe")) {
+                            val normProc = normalizeToStoragePath(target)
+                            if (normProc != null) return normProc
                         }
+                    }
+                } catch (ignored: Exception) {}
+
+                // C. Fallback: Query by DISPLAY_NAME & SIZE in MediaStore (for PhotoPicker / Google Photos URIs)
+                try {
+                    var displayName: String? = null
+                    var size: Long = -1L
+                    val proj = arrayOf(android.provider.OpenableColumns.DISPLAY_NAME, android.provider.OpenableColumns.SIZE)
+                    context.contentResolver.query(uri, proj, null, null, null)?.use { cursor ->
+                        if (cursor.moveToFirst()) {
+                            val nameIdx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                            val sizeIdx = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
+                            if (nameIdx != -1) displayName = cursor.getString(nameIdx)
+                            if (sizeIdx != -1) size = cursor.getLong(sizeIdx)
+                        }
+                    }
+
+                    if (!displayName.isNullOrEmpty()) {
+                        val selection = if (size > 0) {
+                            "${MediaStore.MediaColumns.DISPLAY_NAME}=? AND ${MediaStore.MediaColumns.SIZE}=?"
+                        } else {
+                            "${MediaStore.MediaColumns.DISPLAY_NAME}=?"
+                        }
+                        val selectionArgs = if (size > 0) {
+                            arrayOf(displayName!!, size.toString())
+                        } else {
+                            arrayOf(displayName!!)
+                        }
+
+                        val videoPath = getDataColumn(context, MediaStore.Video.Media.EXTERNAL_CONTENT_URI, selection, selectionArgs)
+                        val normVideo = normalizeToStoragePath(videoPath)
+                        if (normVideo != null) return normVideo
+
+                        val imagePath = getDataColumn(context, MediaStore.Images.Media.EXTERNAL_CONTENT_URI, selection, selectionArgs)
+                        val normImage = normalizeToStoragePath(imagePath)
+                        if (normImage != null) return normImage
+
+                        val filePath = getDataColumn(context, MediaStore.Files.getContentUri("external"), selection, selectionArgs)
+                        val normFile = normalizeToStoragePath(filePath)
+                        if (normFile != null) return normFile
                     }
                 } catch (ignored: Exception) {}
             }
@@ -110,6 +151,31 @@ object UriUtils {
         }
 
         return null
+    }
+
+    private fun normalizeToStoragePath(path: String?): String? {
+        if (path.isNullOrEmpty()) return null
+        var p = path
+        if (p.startsWith("/data/media/0/")) {
+            p = "/storage/emulated/0/" + p.substring("/data/media/0/".length)
+        } else if (p.startsWith("/data/media/")) {
+            val parts = p.split("/")
+            if (parts.size >= 4) {
+                val userId = parts[3]
+                p = "/storage/emulated/$userId/" + p.substring("/data/media/$userId/".length)
+            }
+        } else if (p.startsWith("/mnt/user/0/primary/")) {
+            p = "/storage/emulated/0/" + p.substring("/mnt/user/0/primary/".length)
+        } else if (p.startsWith("/mnt/runtime/default/emulated/0/")) {
+            p = "/storage/emulated/0/" + p.substring("/mnt/runtime/default/emulated/0/".length)
+        } else if (p.startsWith("/mnt/runtime/read/emulated/0/")) {
+            p = "/storage/emulated/0/" + p.substring("/mnt/runtime/read/emulated/0/".length)
+        } else if (p.startsWith("/mnt/runtime/write/emulated/0/")) {
+            p = "/storage/emulated/0/" + p.substring("/mnt/runtime/write/emulated/0/".length)
+        } else if (p.startsWith("/storage/emulated/legacy/")) {
+            p = "/storage/emulated/0/" + p.substring("/storage/emulated/legacy/".length)
+        }
+        return if (File(p).exists()) p else null
     }
 
     private fun getDataColumn(

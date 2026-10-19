@@ -63,10 +63,24 @@ class ConnectionReader {
   StreamSubscription<Uint8List>? _subscription;
   Completer<void>? _dataReadyCompleter;
   bool _isClosed = false;
+  void Function()? onPeerCancelled;
 
   ConnectionReader(this._socket) {
     _subscription = _socket.listen(
       (data) {
+        // Fast-check for peer cancellation control message
+        if (data.length >= 4) {
+          try {
+            final len = ByteData.sublistView(data).getUint32(0, Endian.big);
+            if (len > 0 && len <= data.length - 4 && len < 2048) {
+              final jsonStr = utf8.decode(data.sublist(4, 4 + len));
+              if (jsonStr.contains('"transfer_cancelled"')) {
+                onPeerCancelled?.call();
+                return;
+              }
+            }
+          } catch (_) {}
+        }
         _chunks.addLast(data);
         _bufferLength += data.length;
         if (!(_dataReadyCompleter?.isCompleted ?? true)) {
@@ -320,6 +334,7 @@ Future<void> _serverIsolateEntryPoint(ServerIsolateStartConfig config) async {
 
   config.mainSendPort.send({'type': 'listening', 'port': server.port});
 
+  final Set<String> cancelledTransfers = {};
   final Map<String, Completer<bool>> pendingApprovals = {};
   final Map<String, Socket> activeSockets = {};
 
@@ -330,9 +345,22 @@ Future<void> _serverIsolateEntryPoint(ServerIsolateStartConfig config) async {
         pendingApprovals[id]?.complete(msg['approved']);
         pendingApprovals.remove(id);
       } else if (msg['type'] == 'cancel_transfer') {
-        final id = msg['transferId'];
-        activeSockets[id]?.destroy();
-        activeSockets.remove(id);
+        final id = msg['transferId']?.toString();
+        if (id != null) {
+          cancelledTransfers.add(id);
+          pendingApprovals[id]?.complete(false);
+          pendingApprovals.remove(id);
+          final s = activeSockets[id];
+          if (s != null) {
+            try {
+              _sendMessage(s, {'type': 'transfer_cancelled', 'transferId': id});
+            } catch (_) {}
+            try {
+              s.destroy();
+            } catch (_) {}
+            activeSockets.remove(id);
+          }
+        }
       } else if (msg['type'] == 'shutdown') {
         server?.close();
         for (final socket in activeSockets.values) {
@@ -348,9 +376,34 @@ Future<void> _serverIsolateEntryPoint(ServerIsolateStartConfig config) async {
     socket.setOption(SocketOption.tcpNoDelay, true);
     final reader = ConnectionReader(socket);
     String? currentTransferId;
+    File? currentFileBeingWritten;
+    IOSink? currentSinkBeingWritten;
+
     try {
       final request = await reader.readMessage();
       if (request == null) throw Exception('Invalid request');
+
+      if (request['type'] == 'peer_cancelled_signal') {
+        final cancelId = request['transferId']?.toString();
+        if (cancelId != null) {
+          cancelledTransfers.add(cancelId);
+          pendingApprovals[cancelId]?.complete(false);
+          pendingApprovals.remove(cancelId);
+          final s = activeSockets[cancelId];
+          if (s != null) {
+            try {
+              s.destroy();
+            } catch (_) {}
+            activeSockets.remove(cancelId);
+          }
+          config.mainSendPort.send({
+            'type': 'transfer_cancelled_by_peer',
+            'transferId': cancelId,
+          });
+        }
+        await reader.close();
+        return;
+      }
 
       if (request['type'] == 'clipboard') {
         config.mainSendPort.send({'type': 'clipboard', 'data': request});
@@ -362,18 +415,25 @@ Future<void> _serverIsolateEntryPoint(ServerIsolateStartConfig config) async {
         throw Exception('Unknown request type');
       }
 
-      currentTransferId = request['id'];
-      final transferId = request['id'];
+      currentTransferId = request['id']?.toString();
+      final transferId = currentTransferId!;
       final senderSpeedLimitMBps = request['speedLimitMBps'] ?? 0;
+
+      if (cancelledTransfers.contains(transferId)) {
+        await reader.close();
+        return;
+      }
 
       activeSockets[transferId] = socket;
       final completer = Completer<bool>();
       pendingApprovals[transferId] = completer;
 
-      // Ask main isolate for approval
+      // Ask main isolate for approval with real sender IP and port
       config.mainSendPort.send({
         'type': 'request_approval',
         'transferId': transferId,
+        'senderIp': socket.remoteAddress.address,
+        'senderPort': request['senderPort'] ?? TransferService.defaultPort,
         'metadata': request,
       });
 
@@ -389,6 +449,8 @@ Future<void> _serverIsolateEntryPoint(ServerIsolateStartConfig config) async {
       final files = List<Map<String, dynamic>>.from(request['files']);
 
       for (int fileIndex = 0; fileIndex < files.length; fileIndex++) {
+        if (cancelledTransfers.contains(transferId)) break;
+
         final fileMetadata = files[fileIndex];
         final rawFileName = fileMetadata['name']?.toString() ?? 'file';
         final fileSize = fileMetadata['size'] as int;
@@ -411,6 +473,8 @@ Future<void> _serverIsolateEntryPoint(ServerIsolateStartConfig config) async {
           } catch (_) {}
         }
         final sink = file.openWrite();
+        currentFileBeingWritten = file;
+        currentSinkBeingWritten = sink;
 
         int bytesSinceUpdate = 0;
 
@@ -446,6 +510,7 @@ Future<void> _serverIsolateEntryPoint(ServerIsolateStartConfig config) async {
 
         await sink.flush();
         await sink.close();
+        currentSinkBeingWritten = null;
 
         // Verify file size with retry (protects against antivirus / indexing locking on Windows)
         int downloadedSize = -1;
@@ -491,15 +556,30 @@ Future<void> _serverIsolateEntryPoint(ServerIsolateStartConfig config) async {
           'fileIndex': fileIndex,
           'checksumValid': null, // Fast mode
         });
+        currentFileBeingWritten = null;
       }
 
-      config.mainSendPort.send({
-        'type': 'transfer_completed',
-        'transferId': transferId,
-        'checksumValid': null, // Fast mode
-        'savePath': config.savePath,
-      });
+      if (!cancelledTransfers.contains(transferId)) {
+        config.mainSendPort.send({
+          'type': 'transfer_completed',
+          'transferId': transferId,
+          'checksumValid': null, // Fast mode
+          'savePath': config.savePath,
+        });
+      }
     } catch (e) {
+      if (currentTransferId != null && cancelledTransfers.contains(currentTransferId)) {
+        try {
+          await currentSinkBeingWritten?.close();
+        } catch (_) {}
+        try {
+          if (currentFileBeingWritten != null && currentFileBeingWritten.existsSync()) {
+            currentFileBeingWritten.deleteSync();
+          }
+        } catch (_) {}
+        // Transfer was cancelled; do not notify as failed
+        return;
+      }
       try {
         await _sendMessage(socket, {
           'type': 'transfer_error',
@@ -523,6 +603,32 @@ Future<void> _serverIsolateEntryPoint(ServerIsolateStartConfig config) async {
 // ---------------------------------------------------------
 Future<void> _senderIsolateEntryPoint(SenderIsolateStartConfig config) async {
   Socket? socket;
+  bool isCancelled = false;
+  final commandPort = ReceivePort();
+
+  config.mainSendPort.send({
+    'type': 'isolate_ready',
+    'transferId': config.transferId,
+    'commandPort': commandPort.sendPort,
+  });
+
+  commandPort.listen((msg) {
+    if (msg is Map && msg['type'] == 'cancel') {
+      isCancelled = true;
+      try {
+        if (socket != null) {
+          _sendMessage(socket, {
+            'type': 'transfer_cancelled',
+            'transferId': config.transferId,
+          });
+        }
+      } catch (_) {}
+      try {
+        socket?.destroy();
+      } catch (_) {}
+    }
+  });
+
   try {
     socket = await Socket.connect(
       config.targetIp,
@@ -534,6 +640,18 @@ Future<void> _senderIsolateEntryPoint(SenderIsolateStartConfig config) async {
     await _sendMessage(socket, config.metadata);
 
     final reader = ConnectionReader(socket);
+    reader.onPeerCancelled = () {
+      isCancelled = true;
+      try {
+        socket?.destroy();
+      } catch (_) {}
+      config.mainSendPort.send({
+        'type': 'transfer_cancelled',
+        'transferId': config.transferId,
+        'msg': 'Cancelled by receiver',
+      });
+    };
+
     final response = await reader.readMessage();
     if (response == null || response['type'] != 'transfer_accepted') {
       final reason = response?['type'] == 'transfer_rejected'
@@ -548,6 +666,8 @@ Future<void> _senderIsolateEntryPoint(SenderIsolateStartConfig config) async {
     });
 
     for (final fileMeta in config.files) {
+      if (isCancelled) break;
+
       final filePath = fileMeta['path']?.toString() ?? '';
       if (filePath.isEmpty) {
         throw Exception('File path is missing for ${fileMeta['name']}');
@@ -578,6 +698,8 @@ Future<void> _senderIsolateEntryPoint(SenderIsolateStartConfig config) async {
           final int dynamicChunkSize = getDynamicChunkSize();
 
           while (await raf.position() < length) {
+            if (isCancelled) break;
+
             final chunk = await raf.read(dynamicChunkSize);
 
             if (config.speedLimitMBps > 0) {
@@ -617,6 +739,8 @@ Future<void> _senderIsolateEntryPoint(SenderIsolateStartConfig config) async {
 
       await socket.addStream(stream);
 
+      if (isCancelled) break;
+
       // Send any remaining progress
       if (bytesSinceUpdate > 0) {
         config.mainSendPort.send({
@@ -644,14 +768,24 @@ Future<void> _senderIsolateEntryPoint(SenderIsolateStartConfig config) async {
       });
     }
 
-    await socket.flush();
-    await socket.close();
-    config.mainSendPort.send({
-      'type': 'transfer_completed',
-      'transferId': config.transferId,
-      'checksumValid': null, // Fast mode
-    });
+    if (!isCancelled) {
+      await socket.flush();
+      await socket.close();
+      config.mainSendPort.send({
+        'type': 'transfer_completed',
+        'transferId': config.transferId,
+        'checksumValid': null, // Fast mode
+      });
+    }
   } catch (e) {
+    if (isCancelled) {
+      config.mainSendPort.send({
+        'type': 'transfer_cancelled',
+        'transferId': config.transferId,
+        'msg': 'Transfer cancelled',
+      });
+      return;
+    }
     try {
       if (socket != null) {
         await _sendMessage(socket, {
@@ -666,6 +800,7 @@ Future<void> _senderIsolateEntryPoint(SenderIsolateStartConfig config) async {
       'msg': e.toString(),
     });
   } finally {
+    commandPort.close();
     try {
       socket?.destroy();
     } catch (_) {}
@@ -694,6 +829,7 @@ class TransferService {
   SendPort? _serverSendPort;
   final Map<String, TransferItem> _activeTransfers = {};
   final Map<String, Isolate> _senderIsolates = {};
+  final Map<String, SendPort> _senderCommandPorts = {};
 
   TransferService();
 
@@ -735,9 +871,23 @@ class TransferService {
           _port = msg['port'];
         } else if (type == 'clipboard') {
           onClipboardData?.call(msg['data']);
+        } else if (type == 'transfer_cancelled_by_peer') {
+          final id = msg['transferId'];
+          final transfer = _activeTransfers[id];
+          if (transfer != null) {
+            transfer.status = TransferStatus.cancelled;
+            transfer.errorMessage = 'Cancelled by peer';
+            onTransferUpdate?.call(transfer);
+            _activeTransfers.remove(id);
+            _senderIsolates[id]?.kill();
+            _senderIsolates.remove(id);
+            _senderCommandPorts.remove(id);
+            _checkWakelock();
+          }
         } else if (type == 'request_approval') {
           final transferId = msg['transferId'];
           final request = msg['metadata'];
+          final senderIp = msg['senderIp'] ?? '';
 
           final files = (request['files'] as List)
               .map((f) => FileItem(name: f['name'], size: f['size'], path: ''))
@@ -746,7 +896,7 @@ class TransferService {
           final transfer = TransferItem(
             id: transferId,
             deviceName: request['senderName'] ?? 'Unknown',
-            deviceIp: '',
+            deviceIp: senderIp,
             direction: TransferDirection.receiving,
             files: files,
             status: TransferStatus.waitingApproval,
@@ -891,6 +1041,7 @@ class TransferService {
       'type': 'transfer_request',
       'id': transferId,
       'senderName': _deviceName,
+      'senderPort': _port,
       'speedLimitMBps': speedLimitMBps,
       'files': files.map((f) => {'name': f.name, 'size': f.size}).toList(),
     };
@@ -918,9 +1069,23 @@ class TransferService {
     receivePort.listen((msg) {
       if (msg is Map) {
         final type = msg['type'];
-        if (type == 'transfer_accepted') {
+        if (type == 'isolate_ready') {
+          final port = msg['commandPort'];
+          if (port is SendPort) {
+            _senderCommandPorts[transferId] = port;
+          }
+        } else if (type == 'transfer_accepted') {
           transfer.status = TransferStatus.transferring;
           onUpdate(transfer);
+        } else if (type == 'transfer_cancelled') {
+          transfer.status = TransferStatus.cancelled;
+          transfer.errorMessage = msg['msg'] ?? 'Transfer cancelled';
+          onUpdate(transfer);
+          _activeTransfers.remove(transferId);
+          _senderIsolates.remove(transferId);
+          _senderCommandPorts.remove(transferId);
+          _checkWakelock();
+          receivePort.close();
         } else if (type == 'progress') {
           transfer.bytesTransferred += (msg['bytes'] as int);
           onUpdate(transfer);
@@ -931,14 +1096,22 @@ class TransferService {
           onUpdate(transfer);
           _activeTransfers.remove(transferId);
           _senderIsolates.remove(transferId);
+          _senderCommandPorts.remove(transferId);
           _checkWakelock();
           receivePort.close();
         } else if (type == 'transfer_failed') {
-          transfer.status = TransferStatus.failed;
-          transfer.errorMessage = msg['msg'];
+          final errorMsg = msg['msg']?.toString() ?? '';
+          if (errorMsg.contains('rejected')) {
+            transfer.status = TransferStatus.cancelled;
+            transfer.errorMessage = 'Transfer rejected by receiver';
+          } else {
+            transfer.status = TransferStatus.failed;
+            transfer.errorMessage = errorMsg;
+          }
           onUpdate(transfer);
           _activeTransfers.remove(transferId);
           _senderIsolates.remove(transferId);
+          _senderCommandPorts.remove(transferId);
           _checkWakelock();
           receivePort.close();
         }
@@ -975,8 +1148,12 @@ class TransferService {
     onTransferUpdate?.call(transfer);
 
     if (transfer.direction == TransferDirection.sending) {
-      _senderIsolates[transfer.id]?.kill();
-      _senderIsolates.remove(transfer.id);
+      _senderCommandPorts[transfer.id]?.send({'type': 'cancel'});
+      Future.delayed(const Duration(milliseconds: 300), () {
+        _senderIsolates[transfer.id]?.kill();
+        _senderIsolates.remove(transfer.id);
+        _senderCommandPorts.remove(transfer.id);
+      });
       _checkWakelock();
     } else {
       _serverSendPort?.send({
@@ -984,6 +1161,26 @@ class TransferService {
         'transferId': transfer.id,
       });
     }
+
+    if (transfer.deviceIp.isNotEmpty) {
+      _notifyPeerCancelled(transfer.deviceIp, transfer.id);
+    }
     _activeTransfers.remove(transfer.id);
+  }
+
+  Future<void> _notifyPeerCancelled(String peerIp, String transferId) async {
+    try {
+      final socket = await Socket.connect(
+        peerIp,
+        defaultPort,
+        timeout: const Duration(milliseconds: 1000),
+      );
+      await _sendMessage(socket, {
+        'type': 'peer_cancelled_signal',
+        'transferId': transferId,
+      });
+      await socket.flush();
+      await socket.close();
+    } catch (_) {}
   }
 }
