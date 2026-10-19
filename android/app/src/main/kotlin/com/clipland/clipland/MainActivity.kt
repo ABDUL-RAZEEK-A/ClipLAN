@@ -6,6 +6,10 @@ import io.flutter.plugin.common.MethodChannel
 import android.content.Context
 import android.content.pm.PackageManager
 import android.media.MediaScannerConnection
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.net.Uri
 import android.net.wifi.WifiManager
 import java.io.File
@@ -23,10 +27,12 @@ class MainActivity : FlutterFragmentActivity() {
 
     private var multicastLock: WifiManager.MulticastLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
+    private var wifiNetworkCallback: ConnectivityManager.NetworkCallback? = null
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
         acquireNetworkLocks()
+        registerWifiNetworkBinding()
         handleShareIntent(intent, isInitial = true)
         super.onCreate(savedInstanceState)
     }
@@ -34,10 +40,14 @@ class MainActivity : FlutterFragmentActivity() {
     override fun onResume() {
         super.onResume()
         acquireNetworkLocks()
+        if (wifiNetworkCallback == null) {
+            registerWifiNetworkBinding()
+        }
     }
 
     override fun onDestroy() {
         releaseNetworkLocks()
+        unregisterWifiNetworkBinding()
         super.onDestroy()
     }
 
@@ -80,6 +90,60 @@ class MainActivity : FlutterFragmentActivity() {
             wifiLock = null
         } catch (e: Exception) {
             android.util.Log.e("ClipLAN_MainActivity", "Failed to release WiFi/Multicast locks", e)
+        }
+    }
+
+    private fun registerWifiNetworkBinding() {
+        try {
+            val connectivityManager = applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
+            
+            // Specifically match Wi-Fi / Local WLAN without requiring NET_CAPABILITY_INTERNET
+            // This ensures offline hotspots and local Wi-Fi networks are bound to the app process
+            // so Android never drops them or routes traffic through Mobile Data!
+            val request = NetworkRequest.Builder()
+                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .build()
+
+            val callback = object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) {
+                    super.onAvailable(network)
+                    try {
+                        connectivityManager.bindProcessToNetwork(network)
+                        android.util.Log.i("ClipLAN_Net", "Bound process to Wi-Fi/Hotspot network: $network (Offline LAN enabled, Mobile Data bypassed)")
+                    } catch (e: Exception) {
+                        android.util.Log.e("ClipLAN_Net", "Failed to bind process to Wi-Fi network", e)
+                    }
+                }
+
+                override fun onLost(network: Network) {
+                    super.onLost(network)
+                    try {
+                        connectivityManager.bindProcessToNetwork(null)
+                        android.util.Log.i("ClipLAN_Net", "Unbound process from Wi-Fi network: $network")
+                    } catch (e: Exception) {
+                        android.util.Log.e("ClipLAN_Net", "Failed to unbind process", e)
+                    }
+                }
+            }
+
+            wifiNetworkCallback = callback
+            connectivityManager.registerNetworkCallback(request, callback)
+        } catch (e: Exception) {
+            android.util.Log.e("ClipLAN_Net", "Error registering Wi-Fi network callback", e)
+        }
+    }
+
+    private fun unregisterWifiNetworkBinding() {
+        try {
+            wifiNetworkCallback?.let {
+                val connectivityManager = applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                connectivityManager?.unregisterNetworkCallback(it)
+                connectivityManager?.bindProcessToNetwork(null)
+            }
+            wifiNetworkCallback = null
+        } catch (e: Exception) {
+            android.util.Log.e("ClipLAN_Net", "Error unregistering Wi-Fi network callback", e)
         }
     }
 

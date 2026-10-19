@@ -54,6 +54,75 @@ class SenderIsolateStartConfig {
   );
 }
 
+Future<InternetAddress?> _findMatchingSourceAddress(String targetIp) async {
+  try {
+    final targetParts = targetIp.split('.');
+    if (targetParts.length != 4) return null;
+
+    final interfaces = await NetworkInterface.list(
+      type: InternetAddressType.IPv4,
+      includeLinkLocal: false,
+    );
+
+    InternetAddress? fallbackAddress;
+
+    for (final iface in interfaces) {
+      final name = iface.name.toLowerCase();
+      // Strictly ignore cellular/mobile data and virtual/VPN adapters
+      if (name.startsWith('rmnet') ||
+          name.startsWith('ccmni') ||
+          name.startsWith('pdp') ||
+          name.startsWith('clat') ||
+          name.startsWith('dummy') ||
+          name.startsWith('radio') ||
+          name.startsWith('wwan') ||
+          name.startsWith('cellular') ||
+          name.startsWith('mobile') ||
+          name.startsWith('tun') ||
+          name.startsWith('tap') ||
+          name.startsWith('utun') ||
+          name.contains('vpn') ||
+          name.contains('docker') ||
+          name.contains('vbox') ||
+          name.contains('vmware')) {
+        continue;
+      }
+
+      for (final addr in iface.addresses) {
+        if (addr.isLoopback || addr.type != InternetAddressType.IPv4) continue;
+        final ip = addr.address;
+        final parts = ip.split('.');
+        if (parts.length != 4) continue;
+
+        // Exact /24 subnet match (standard for Wi-Fi and Hotspots)
+        if (parts[0] == targetParts[0] &&
+            parts[1] == targetParts[1] &&
+            parts[2] == targetParts[2]) {
+          return addr;
+        }
+
+        // Subnet /16 match
+        if (parts[0] == targetParts[0] && parts[1] == targetParts[1]) {
+          fallbackAddress ??= addr;
+        }
+
+        // Wi-Fi or Hotspot interface priority
+        if (name.startsWith('wlan') ||
+            name.startsWith('ap') ||
+            name.startsWith('softap') ||
+            name.startsWith('swlan') ||
+            name.startsWith('p2p') ||
+            name.startsWith('rndis')) {
+          fallbackAddress ??= addr;
+        }
+      }
+    }
+    return fallbackAddress;
+  } catch (_) {
+    return null;
+  }
+}
+
 /// High-performance buffered socket reader using Queue for O(1) dequeue.
 /// Modeled after LocalSend's chunked TCP reader with backpressure.
 class ConnectionReader {
@@ -630,9 +699,11 @@ Future<void> _senderIsolateEntryPoint(SenderIsolateStartConfig config) async {
   });
 
   try {
+    final sourceAddr = await _findMatchingSourceAddress(config.targetIp);
     socket = await Socket.connect(
       config.targetIp,
       config.targetPort,
+      sourceAddress: sourceAddr,
       timeout: const Duration(seconds: 10),
     );
     socket.setOption(SocketOption.tcpNoDelay, true);
@@ -1124,9 +1195,11 @@ class TransferService {
   Future<bool> sendClipboard(String text, DeviceInfo device) async {
     // Keep clipboard simple on main thread
     try {
+      final sourceAddr = await _findMatchingSourceAddress(device.ip);
       final socket = await Socket.connect(
         device.ip,
         device.port,
+        sourceAddress: sourceAddr,
         timeout: const Duration(seconds: 5),
       );
       await _sendMessage(socket, {
@@ -1170,9 +1243,11 @@ class TransferService {
 
   Future<void> _notifyPeerCancelled(String peerIp, String transferId) async {
     try {
+      final sourceAddr = await _findMatchingSourceAddress(peerIp);
       final socket = await Socket.connect(
         peerIp,
         defaultPort,
+        sourceAddress: sourceAddr,
         timeout: const Duration(milliseconds: 1000),
       );
       await _sendMessage(socket, {

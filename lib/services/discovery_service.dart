@@ -136,7 +136,11 @@ class DiscoveryService {
         final name = iface.name.toLowerCase();
         if (name.contains('vethernet') || name.contains('virtual') || name.contains('wsl') ||
             name.contains('vbox') || name.contains('vmware') || name.contains('hyper-v') ||
-            name.contains('docker') || name.contains('vpn') || name.contains('loopback')) {
+            name.contains('docker') || name.contains('vpn') || name.contains('loopback') ||
+            name.startsWith('rmnet') || name.startsWith('ccmni') || name.startsWith('pdp') ||
+            name.startsWith('clat') || name.startsWith('dummy') || name.startsWith('radio') ||
+            name.startsWith('wwan') || name.startsWith('cellular') || name.startsWith('mobile') ||
+            name.startsWith('tun') || name.startsWith('tap') || name.startsWith('utun')) {
           continue;
         }
         for (final addr in iface.addresses) {
@@ -252,37 +256,9 @@ Future<void> _discoveryIsolateEntryPoint(_IsolateConfig config) async {
     config.sendPort.send(LogMessage(message));
   }
 
-  Future<String?> getLocalIpViaSocket() async {
-    RawDatagramSocket? probe;
-    try {
-      probe = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
-      probe.send([0], InternetAddress('8.8.8.8'), 53);
-      await Future.delayed(const Duration(milliseconds: 50));
-      final interfaces = await NetworkInterface.list(type: InternetAddressType.IPv4, includeLinkLocal: false);
-      for (final iface in interfaces) {
-        final name = iface.name.toLowerCase();
-        if (name.startsWith('pdp_ip') || name.startsWith('rmnet') || name.startsWith('utun') || name.startsWith('tun') || name.startsWith('tap')) continue;
-        for (final addr in iface.addresses) {
-          if (!addr.isLoopback && addr.type == InternetAddressType.IPv4) return addr.address;
-        }
-      }
-      try {
-        final tcpSocket = await Socket.connect('8.8.8.8', 53, timeout: const Duration(seconds: 2));
-        final ip = tcpSocket.address.address;
-        tcpSocket.destroy();
-        if (ip != '0.0.0.0' && ip != '127.0.0.1') return ip;
-      } catch (_) {}
-      return null;
-    } catch (e) {
-      log('[DiscoveryIsolate] getLocalIpViaSocket error: $e');
-      return null;
-    } finally {
-      probe?.close();
-    }
-  }
-
   bool isVirtualOrVpn(String name, String ip) {
     final lower = name.toLowerCase();
+    // Strictly filter all Cellular / Mobile Data interfaces to guarantee offline LAN operation
     if (lower.startsWith('rmnet') ||
         lower.startsWith('ccmni') ||
         lower.startsWith('pdp') ||
@@ -290,6 +266,8 @@ Future<void> _discoveryIsolateEntryPoint(_IsolateConfig config) async {
         lower.startsWith('dummy') ||
         lower.startsWith('radio') ||
         lower.startsWith('wwan') ||
+        lower.startsWith('cellular') ||
+        lower.startsWith('mobile') ||
         lower.startsWith('tun') ||
         lower.startsWith('tap') ||
         lower.startsWith('utun') ||
@@ -323,6 +301,8 @@ Future<void> _discoveryIsolateEntryPoint(_IsolateConfig config) async {
         lower.startsWith('swlan') ||
         lower.startsWith('softap') ||
         lower.startsWith('p2p') ||
+        lower.startsWith('rndis') ||
+        lower.startsWith('usb') ||
         lower.contains('wireless') ||
         lower.contains('ethernet') ||
         lower.startsWith('eth') ||
@@ -340,6 +320,39 @@ Future<void> _discoveryIsolateEntryPoint(_IsolateConfig config) async {
       }
     }
     return false;
+  }
+
+  Future<String?> getLocalIpViaSocket() async {
+    try {
+      final interfaces = await NetworkInterface.list(
+        type: InternetAddressType.IPv4,
+        includeLinkLocal: false,
+      );
+      String? bestIp;
+      int bestScore = -1;
+
+      for (final iface in interfaces) {
+        final name = iface.name;
+        for (final addr in iface.addresses) {
+          if (addr.isLoopback || addr.type != InternetAddressType.IPv4) continue;
+          final ip = addr.address;
+          if (isVirtualOrVpn(name, ip)) continue;
+
+          int score = 0;
+          if (isHighPriorityAdapter(name)) score += 10;
+          if (isPrivateLanIp(ip)) score += 5;
+
+          if (score > bestScore) {
+            bestScore = score;
+            bestIp = ip;
+          }
+        }
+      }
+      return bestIp;
+    } catch (e) {
+      log('[DiscoveryIsolate] getLocalIpViaSocket error: $e');
+      return null;
+    }
   }
 
   Future<void> findLocalIps() async {
@@ -446,8 +459,36 @@ Future<void> _discoveryIsolateEntryPoint(_IsolateConfig config) async {
                 socket!.send(data, InternetAddress(subnetBroadcast16), DiscoveryService.discoveryPort);
               } catch (_) {}
             }
+            // Hotspot unicast: If this device is a client on a hotspot (e.g. 192.168.43.15),
+            // send unicast directly to the hotspot gateway (.1). Android hotspots often
+            // filter UDP subnet broadcast, but ALWAYS route unicast to the host!
+            if (parts[3] != '1') {
+              try {
+                final gatewayIp = '${parts[0]}.${parts[1]}.${parts[2]}.1';
+                socket!.send(data, InternetAddress(gatewayIp), DiscoveryService.discoveryPort);
+              } catch (_) {}
+            }
           }
         }
+
+        // On Android, check ARP cache for connected hotspot clients to discover peers directly
+        if (config.isAndroid) {
+          try {
+            final arpLines = File('/proc/net/arp').readAsLinesSync();
+            for (final line in arpLines) {
+              final parts = line.trim().split(RegExp(r'\s+'));
+              if (parts.length >= 4 && parts[0] != 'IP') {
+                final clientIp = parts[0];
+                if (parts[3] != '00:00:00:00:00:00' && !localIps.contains(clientIp)) {
+                  try {
+                    socket!.send(data, InternetAddress(clientIp), DiscoveryService.discoveryPort);
+                  } catch (_) {}
+                }
+              }
+            }
+          } catch (_) {}
+        }
+
         for (final device in devices.values) {
           if (device.ip.isNotEmpty && !localIps.contains(device.ip)) {
             try {
