@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../models/transfer_item.dart';
 import '../theme/app_theme.dart';
+import '../services/native_picker_service.dart';
 
 enum FileCategory {
   recents,
@@ -658,18 +659,60 @@ class _InAppFileBrowserState extends State<InAppFileBrowser> {
                 ),
                 IconButton(
                   icon: const Icon(
+                    Icons.photo_library_rounded,
+                    color: AppColors.primaryLight,
+                  ),
+                  tooltip: 'Pick from Gallery',
+                  onPressed: () async {
+                    try {
+                      List<PlatformFile>? files;
+                      if (NativePickerService.isSupported) {
+                        files = await NativePickerService.pickFiles(
+                          allowMultiple: true,
+                          type: 'media',
+                        );
+                      } else {
+                        final result = await FilePicker.pickFiles(
+                          allowMultiple: true,
+                          type: FileType.media,
+                          dialogTitle: 'Select photos & videos to share',
+                        );
+                        files = result?.files;
+                      }
+                      if (files != null && files.isNotEmpty) {
+                        widget.onFilesSelected(files);
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                        }
+                      }
+                    } catch (e) {
+                      debugPrint('[InAppBrowser] Gallery picker error: $e');
+                    }
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(
                     Icons.folder_open_rounded,
                     color: AppColors.primaryLight,
                   ),
                   tooltip: 'Open in System File Explorer',
                   onPressed: () async {
                     try {
-                      final result = await FilePicker.pickFiles(
-                        allowMultiple: true,
-                        dialogTitle: 'Select files to share',
-                      );
-                      if (result != null && result.files.isNotEmpty) {
-                        widget.onFilesSelected(result.files);
+                      List<PlatformFile>? files;
+                      if (NativePickerService.isSupported) {
+                        files = await NativePickerService.pickFiles(
+                          allowMultiple: true,
+                          type: 'any',
+                        );
+                      } else {
+                        final result = await FilePicker.pickFiles(
+                          allowMultiple: true,
+                          dialogTitle: 'Select files to share',
+                        );
+                        files = result?.files;
+                      }
+                      if (files != null && files.isNotEmpty) {
+                        widget.onFilesSelected(files);
                         if (context.mounted) {
                           Navigator.pop(context);
                         }

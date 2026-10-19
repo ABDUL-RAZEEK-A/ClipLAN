@@ -14,6 +14,9 @@ class MainActivity : FlutterFragmentActivity() {
     private val CHANNEL = "com.cliplan/apkPaths"
     private val MEDIA_SCANNER_CHANNEL = "com.cliplan/mediaScanner"
     private val SHARE_INTENT_CHANNEL = "com.cliplan/shareIntent"
+    private val NATIVE_PICKER_CHANNEL = "com.cliplan/nativePicker"
+    private val PICK_FILES_REQUEST_CODE = 4129
+    private var pendingPickerResult: MethodChannel.Result? = null
 
     private var initialSharedPaths: List<String>? = null
     private var shareMethodChannel: MethodChannel? = null
@@ -227,6 +230,131 @@ class MainActivity : FlutterFragmentActivity() {
                 }
                 else -> result.notImplemented()
             }
+        }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, NATIVE_PICKER_CHANNEL).setMethodCallHandler { call, result ->
+            if (call.method == "pickFiles") {
+                val allowMultiple = call.argument<Boolean>("allowMultiple") ?: true
+                val type = call.argument<String>("type") ?: "any"
+
+                pendingPickerResult?.error("CANCELLED", "New pick request started", null)
+                pendingPickerResult = result
+
+                try {
+                    val intent = android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT).apply {
+                        addCategory(android.content.Intent.CATEGORY_OPENABLE)
+                        if (type == "media" || type == "image_video") {
+                            this.type = "*/*"
+                            putExtra(android.content.Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "video/*"))
+                        } else if (type == "image") {
+                            this.type = "image/*"
+                        } else if (type == "video") {
+                            this.type = "video/*"
+                        } else {
+                            this.type = "*/*"
+                        }
+                        putExtra(android.content.Intent.EXTRA_ALLOW_MULTIPLE, allowMultiple)
+                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+                    }
+                    startActivityForResult(intent, PICK_FILES_REQUEST_CODE)
+                } catch (e: Exception) {
+                    try {
+                        val intent = android.content.Intent(android.content.Intent.ACTION_GET_CONTENT).apply {
+                            if (type == "media" || type == "image_video") {
+                                this.type = "*/*"
+                                putExtra(android.content.Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "video/*"))
+                            } else if (type == "image") {
+                                this.type = "image/*"
+                            } else if (type == "video") {
+                                this.type = "video/*"
+                            } else {
+                                this.type = "*/*"
+                            }
+                            putExtra(android.content.Intent.EXTRA_ALLOW_MULTIPLE, allowMultiple)
+                        }
+                        startActivityForResult(intent, PICK_FILES_REQUEST_CODE)
+                    } catch (err: Exception) {
+                        pendingPickerResult = null
+                        result.error("PICKER_ERROR", err.message, null)
+                    }
+                }
+            } else {
+                result.notImplemented()
+            }
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == PICK_FILES_REQUEST_CODE) {
+            val pending = pendingPickerResult
+            pendingPickerResult = null
+            if (pending == null) return
+
+            if (resultCode != android.app.Activity.RESULT_OK || data == null) {
+                pending.success(emptyList<Map<String, Any>>())
+                return
+            }
+
+            val uris = mutableListOf<Uri>()
+            data.clipData?.let { clipData ->
+                for (i in 0 until clipData.itemCount) {
+                    val itemUri = clipData.getItemAt(i).uri
+                    if (itemUri != null) uris.add(itemUri)
+                }
+            }
+            if (uris.isEmpty() && data.data != null) {
+                uris.add(data.data!!)
+            }
+
+            val resolved = mutableListOf<Map<String, Any>>()
+            for (uri in uris) {
+                try {
+                    try {
+                        contentResolver.takePersistableUriPermission(
+                            uri,
+                            android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        )
+                    } catch (ignored: Exception) {}
+
+                    val path = UriUtils.getRealPathFromUri(this, uri)
+                    if (path != null && File(path).exists()) {
+                        val file = File(path)
+                        resolved.add(mapOf(
+                            "path" to path,
+                            "name" to file.name,
+                            "size" to file.length()
+                        ))
+                    } else {
+                        var name: String? = null
+                        var size: Long = -1L
+                        contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME, android.provider.OpenableColumns.SIZE), null, null, null)?.use { c ->
+                            if (c.moveToFirst()) {
+                                val nIdx = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                                val sIdx = c.getColumnIndex(android.provider.OpenableColumns.SIZE)
+                                if (nIdx != -1) name = c.getString(nIdx)
+                                if (sIdx != -1) size = c.getLong(sIdx)
+                            }
+                        }
+                        val fallbackFile = File(cacheDir, name ?: "picked_${System.currentTimeMillis()}")
+                        contentResolver.openInputStream(uri)?.use { input ->
+                            fallbackFile.outputStream().use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                        if (fallbackFile.exists()) {
+                            resolved.add(mapOf(
+                                "path" to fallbackFile.absolutePath,
+                                "name" to fallbackFile.name,
+                                "size" to fallbackFile.length()
+                            ))
+                        }
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("ClipLAN_Picker", "Error resolving picked URI: $uri", e)
+                }
+            }
+            pending.success(resolved)
         }
     }
 }
