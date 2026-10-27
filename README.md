@@ -31,8 +31,6 @@ Get the latest stable release for your platform from the GitHub Releases Page.
 
 ---
 
-
-
 ## 📖 Developer Story
 
 ### Why We Built It
